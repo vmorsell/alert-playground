@@ -1,25 +1,29 @@
 import { useState, useEffect, useCallback } from 'react';
 import { subMinutes, isAfter } from 'date-fns';
 import type { Metric, MetricDataPoint, MetricStats, MetricType } from '../types/metrics';
+import { METRIC_CONFIGS, getAllMetricConfigs } from '../config/metrics';
 
 const SIMULATION_INTERVAL = 1000; // 1 second
 const DATA_RETENTION_MINUTES = 15; // Keep 15 minutes of data
 
-const initMetric = (id: MetricType, name: string, unit: string, baseValue: number, variance: number): Metric => ({
-  id,
-  name,
-  unit,
-  dataPoints: [],
-  stats: {
-    current: 0,
-    rolling1Min: { avg: 0, min: 0, max: 0 },
-    rolling5Min: { avg: 0, min: 0, max: 0 },
-    rolling15Min: { avg: 0, min: 0, max: 0 },
-  },
-  baseValue,
-  variance,
-  adjustment: 0,
-});
+const createInitialMetric = (metricType: MetricType): Metric => {
+  const config = METRIC_CONFIGS[metricType];
+  return {
+    id: config.id,
+    name: config.name,
+    unit: config.unit,
+    dataPoints: [],
+    stats: {
+      current: 0,
+      rolling1Min: { avg: 0, min: 0, max: 0 },
+      rolling5Min: { avg: 0, min: 0, max: 0 },
+      rolling15Min: { avg: 0, min: 0, max: 0 },
+    },
+    baseValue: config.baseValue,
+    variance: config.variance,
+    adjustment: 0,
+  };
+};
 
 const calculateStats = (dataPoints: MetricDataPoint[], now: Date): MetricStats => {
   if (dataPoints.length === 0) {
@@ -58,19 +62,20 @@ const calculateStats = (dataPoints: MetricDataPoint[], now: Date): MetricStats =
   };
 };
 
-const nextValue = (baseValue: number, variance: number, adjustment: number): number => {
+const generateValue = (baseValue: number, variance: number, adjustment: number): number => {
   const randomVariation = (Math.random() - 0.5) * variance * 2;
   const value = baseValue + randomVariation + adjustment;
   return Math.max(0, value); // Ensure non-negative values
 };
 
 export const useMetricSimulator = () => {
-  const [metrics, setMetrics] = useState<Record<MetricType, Metric>>(() => ({
-    errorRate: initMetric('errorRate', 'Error Rate', '%', 2, 1),
-    p95ResponseTime: initMetric('p95ResponseTime', 'P95 Response Time', 'ms', 150, 50),
-    cpuUsage: initMetric('cpuUsage', 'CPU Usage', '%', 45, 15),
-    memoryUsage: initMetric('memoryUsage', 'Memory Usage', '%', 65, 10),
-  }));
+  const [metrics, setMetrics] = useState<Record<MetricType, Metric>>(() => {
+    const initialMetrics = {} as Record<MetricType, Metric>;
+    getAllMetricConfigs().forEach(config => {
+      initialMetrics[config.id] = createInitialMetric(config.id);
+    });
+    return initialMetrics;
+  });
 
   const cleanupOldData = useCallback((dataPoints: MetricDataPoint[], now: Date): MetricDataPoint[] => {
     const cutoff = subMinutes(now, DATA_RETENTION_MINUTES);
@@ -87,20 +92,25 @@ export const useMetricSimulator = () => {
         const metricType = key as MetricType;
         const metric = updatedMetrics[metricType];
         
-        const v = nextValue(metric.baseValue, metric.variance, metric.adjustment);
-        const dp: MetricDataPoint = {
+        // Generate new value
+        const newValue = generateValue(metric.baseValue, metric.variance, metric.adjustment);
+        
+        // Add new data point
+        const newDataPoint: MetricDataPoint = {
           timestamp: now,
-          value: v,
+          value: newValue,
         };
         
-        const cleanedDataPoints = cleanupOldData([...metric.dataPoints, dp], now);
+        // Clean up old data and add new point
+        const cleanedDataPoints = cleanupOldData([...metric.dataPoints, newDataPoint], now);
         
-        const stats = calculateStats(cleanedDataPoints, now);
+        // Calculate new stats
+        const newStats = calculateStats(cleanedDataPoints, now);
         
         updatedMetrics[metricType] = {
           ...metric,
           dataPoints: cleanedDataPoints,
-          stats: stats,
+          stats: newStats,
         };
       });
       
