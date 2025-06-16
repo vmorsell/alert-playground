@@ -43,7 +43,7 @@ export const MetricChart: React.FC<MetricChartProps> = ({
   const chartData = {
     datasets: [
       {
-        label: title,
+        label: title || 'Value',
         data: dataPoints.map(point => ({
           x: point.timestamp.getTime(),
           y: point.value,
@@ -51,10 +51,10 @@ export const MetricChart: React.FC<MetricChartProps> = ({
         borderColor: color,
         backgroundColor: color + '20',
         borderWidth: 2,
-        pointRadius: 1,
-        pointHoverRadius: 4,
+        pointRadius: 0,
+        pointHoverRadius: 3,
         fill: true,
-        tension: 0.2,
+        tension: 0.3,
       },
     ],
   };
@@ -67,10 +67,10 @@ export const MetricChart: React.FC<MetricChartProps> = ({
         display: false,
       },
       title: {
-        display: true,
+        display: !!title,
         text: title,
         font: {
-          size: 16,
+          size: 14,
           weight: 'bold' as const,
         },
       },
@@ -93,26 +93,44 @@ export const MetricChart: React.FC<MetricChartProps> = ({
             second: 'HH:mm:ss',
           },
         },
-        title: {
+        grid: {
           display: true,
-          text: 'Time (Last 2 Minutes)',
+          color: 'rgba(0, 0, 0, 0.05)',
+        },
+        ticks: {
+          maxTicksLimit: 6,
+          font: {
+            size: 10,
+          },
         },
       },
       y: {
         beginAtZero: false,
-        title: {
+        grid: {
           display: true,
-          text: unit,
+          color: 'rgba(0, 0, 0, 0.05)',
+        },
+        ticks: {
+          font: {
+            size: 10,
+          },
+          callback: function(value: any) {
+            return `${value.toFixed(1)} ${unit}`;
+          },
         },
       },
     },
     animation: {
       duration: 0, // Disable animations for real-time updates
     },
+    interaction: {
+      intersect: false,
+      mode: 'index' as const,
+    },
   };
 
   return (
-    <div style={{ height: '200px', width: '100%' }}>
+    <div className="chart-container" style={{ height: '160px', width: '100%' }}>
       <Line data={chartData} options={options} />
     </div>
   );
