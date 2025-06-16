@@ -46,7 +46,7 @@ export class IncidentIoService {
         deduplication_key: deduplicationKey,
         group_key: groupKey,
         source_url: window.location.href,
-        title: `🚨 ${threshold.priority}: ${threshold.description}`,
+        title: `${serviceName}: ${threshold.description}`,
         description: `${threshold.description} / Current value is ${currentValue.toFixed(1)}% on ${serviceName} - exceeds ${threshold.priority} threshold of ${threshold.threshold}%`,
         status: 'firing',
         metadata: {
@@ -103,7 +103,7 @@ export class IncidentIoService {
         deduplication_key: deduplicationKey,
         group_key: groupKey,
         source_url: window.location.href,
-        title: `✅ ${threshold.priority}: ${threshold.description} - Resolved`,
+        title: `${serviceName}: ${threshold.description} - Resolved`,
         description: `${threshold.description} resolved / Current value is ${currentValue.toFixed(1)}% on ${serviceName} - below ${threshold.priority} threshold of ${threshold.threshold}%`,
         status: 'resolved',
         metadata: {
