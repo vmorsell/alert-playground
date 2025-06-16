@@ -11,7 +11,8 @@ import {
   TimeScale,
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import type { MetricDataPoint } from '../types/metrics';
+import type { MetricDataPoint, AlertThreshold } from '../types/metrics';
+import { ALERT_COLORS } from '../config/metrics';
 
 ChartJS.register(
   CategoryScale,
@@ -29,16 +30,35 @@ interface MetricChartProps {
   unit: string;
   dataPoints: MetricDataPoint[];
   color?: string;
+  alertThresholds?: AlertThreshold[];
 }
 
 export const MetricChart: React.FC<MetricChartProps> = ({ 
   title, 
   unit, 
   dataPoints, 
-  color = '#3b82f6' 
+  color = '#3b82f6',
+  alertThresholds = []
 }) => {
   const now = new Date();
   const twoMinutesAgo = new Date(now.getTime() - 120 * 1000); // 120 seconds ago
+
+  // Create threshold datasets
+  const thresholdDatasets = alertThresholds.map(threshold => ({
+    label: `${threshold.priority} Threshold`,
+    data: [
+      { x: twoMinutesAgo.getTime(), y: threshold.threshold },
+      { x: now.getTime(), y: threshold.threshold }
+    ],
+    borderColor: ALERT_COLORS[threshold.priority],
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderDash: [5, 5],
+    pointRadius: 0,
+    pointHoverRadius: 0,
+    fill: false,
+    tension: 0,
+  }));
 
   const chartData = {
     datasets: [
@@ -56,6 +76,7 @@ export const MetricChart: React.FC<MetricChartProps> = ({
         fill: true,
         tension: 0.3,
       },
+      ...thresholdDatasets,
     ],
   };
 
@@ -77,8 +98,16 @@ export const MetricChart: React.FC<MetricChartProps> = ({
       tooltip: {
         callbacks: {
           label: (context: any) => {
+            const datasetLabel = context.dataset.label;
+            if (datasetLabel && datasetLabel.includes('Threshold')) {
+              return `${datasetLabel}: ${context.parsed.y.toFixed(2)} ${unit}`;
+            }
             return `${context.parsed.y.toFixed(2)} ${unit}`;
           },
+        },
+        filter: (tooltipItem: any) => {
+          // Only show tooltip for the main data line when hovering over threshold lines
+          return !tooltipItem.dataset.label?.includes('Threshold') || tooltipItem.datasetIndex === 0;
         },
       },
     },

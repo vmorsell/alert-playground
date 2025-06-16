@@ -144,7 +144,25 @@ export const MetricDashboard: React.FC = () => {
                         unit={config.unit}
                         dataPoints={metric.dataPoints.slice(-120)} // Last 2 minutes
                         color={alertColor}
+                        alertThresholds={config.alertThresholds}
                       />
+                      
+                      {/* Threshold Legend */}
+                      {config.alertThresholds.length > 0 && (
+                        <div className="flex gap-3 mt-2 text-xs">
+                          {config.alertThresholds.map(threshold => (
+                            <div key={threshold.priority} className="flex items-center gap-1">
+                              <div 
+                                className="w-3 h-0.5 border-dashed border-t-2"
+                                style={{ borderColor: ALERT_COLORS[threshold.priority] }}
+                              />
+                              <span className="text-gray-600">
+                                {threshold.priority}: {threshold.threshold}{config.unit}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   
