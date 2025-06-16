@@ -123,6 +123,16 @@ export const IncidentIoConfigComponent: React.FC<IncidentIoConfigProps> = ({
             </label>
           </div>
 
+          {/* Security Warning */}
+          <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+            <div className="flex items-start gap-2">
+              <span className="text-amber-600 text-sm">⚠️</span>
+              <div className="text-sm text-amber-800">
+                <strong>Security Warning:</strong> Do not use production API tokens or connect to production alert sources. Use a test environment or dedicated demo workspace.
+              </div>
+            </div>
+          </div>
+
           {/* API Configuration */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
