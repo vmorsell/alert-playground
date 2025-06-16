@@ -1,17 +1,4 @@
-import type { IncidentIoConfig, AlertThreshold, MetricType, ThresholdAlertState } from '../types/metrics';
-
-interface AlertEventPayload {
-  title: string;
-  description: string;
-  deduplication_key: string;
-  status: 'firing' | 'resolved';
-  metadata: {
-    priority: string;
-    group_key: string;
-    [key: string]: string | number | boolean | undefined;
-  };
-  source_url?: string;
-}
+import type { IncidentIoConfig, AlertThreshold } from '../types/metrics';
 
 interface AlertEventResponse {
   deduplication_key: string;
@@ -33,55 +20,46 @@ export class IncidentIoService {
     this.config = config;
   }
 
-  private generateDeduplicationKey(metricType: MetricType, priority: string): string {
-    return `alert-playground-${SESSION_ID}-${metricType}-${priority}`;
+  private generateDeduplicationKey(metricName: string, priority: string): string {
+    return `alert-playground-${SESSION_ID}-${metricName}-${priority}`;
   }
 
-  private generateGroupKey(metricType: MetricType): string {
-    return `alert-playground-${SESSION_ID}-${metricType}`;
-  }
-
-  private mapPriorityToIncidentIo(priority: string): string {
-    // Map our P0-P4 to incident.io format (lowercase)
-    return priority.toLowerCase();
+  private generateGroupKey(metricName: string): string {
+    return `alert-playground-${SESSION_ID}-${metricName}`;
   }
 
   async postThresholdAlert(
-    metricType: MetricType,
     metricName: string,
-    thresholdAlert: ThresholdAlertState,
+    threshold: AlertThreshold,
     currentValue: number,
-    unit: string
-  ): Promise<AlertEventResponse | null> {
-    if (!this.config.enabled || !this.config.token || !this.config.alertSourceConfigId) {
-      console.log('Incident.io not configured or disabled');
-      return null;
+    serviceName: string = 'demo-service'
+  ): Promise<void> {
+    if (!this.config.enabled) {
+      return;
     }
 
-    const threshold = thresholdAlert.threshold;
-    const deduplicationKey = this.generateDeduplicationKey(metricType, threshold.priority);
-    const groupKey = this.generateGroupKey(metricType);
-
-    const payload: AlertEventPayload = {
-      title: `${metricName} Alert - ${threshold.description}`,
-      description: `**Metric:** ${metricName}\n**Current Value:** ${currentValue.toFixed(2)} ${unit}\n**Threshold:** ${threshold.threshold} ${unit}\n**Priority:** ${threshold.priority}\n\n${threshold.description}`,
-      deduplication_key: deduplicationKey,
-      status: 'firing',
-      metadata: {
-        ...this.config.metadata,
-        priority: this.mapPriorityToIncidentIo(threshold.priority),
-        group_key: groupKey,
-        metric_type: metricType,
-        metric_name: metricName,
-        current_value: currentValue.toString(),
-        threshold_value: threshold.threshold.toString(),
-        threshold_priority: threshold.priority,
-        unit: unit,
-      },
-      source_url: window.location.href,
-    };
-
     try {
+      const deduplicationKey = this.generateDeduplicationKey(metricName, threshold.priority);
+      const groupKey = this.generateGroupKey(metricName);
+
+      const alertData = {
+        deduplication_key: deduplicationKey,
+        group_key: groupKey,
+        source_url: window.location.href,
+        title: `🚨 ${threshold.priority}: ${threshold.description}`,
+        description: `${threshold.description} / Current value is ${currentValue.toFixed(1)}% on ${serviceName} - exceeds ${threshold.priority} threshold of ${threshold.threshold}%`,
+        status: 'firing',
+        metadata: {
+          ...this.config.metadata,
+          priority: threshold.priority.toLowerCase(),
+          group_key: groupKey,
+          metric_name: metricName,
+          current_value: currentValue,
+          threshold_value: threshold.threshold,
+          service: serviceName,
+        },
+      };
+
       const response = await fetch(
         `/api/incident-io/v2/alert_events/http/${this.config.alertSourceConfigId}`,
         {
@@ -90,7 +68,7 @@ export class IncidentIoService {
             'Authorization': `Bearer ${this.config.token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(alertData),
         }
       );
 
@@ -101,7 +79,6 @@ export class IncidentIoService {
 
       const result: AlertEventResponse = await response.json();
       console.log('Threshold alert posted to Incident.io:', result);
-      return result;
     } catch (error) {
       console.error('Failed to post threshold alert to Incident.io:', error);
       throw error;
@@ -109,34 +86,37 @@ export class IncidentIoService {
   }
 
   async resolveThresholdAlert(
-    metricType: MetricType,
     metricName: string,
-    threshold: AlertThreshold
-  ): Promise<AlertEventResponse | null> {
-    if (!this.config.enabled || !this.config.token || !this.config.alertSourceConfigId) {
-      return null;
+    threshold: AlertThreshold,
+    currentValue: number,
+    serviceName: string = 'demo-service'
+  ): Promise<void> {
+    if (!this.config.enabled) {
+      return;
     }
 
-    const deduplicationKey = this.generateDeduplicationKey(metricType, threshold.priority);
-    const groupKey = this.generateGroupKey(metricType);
-
-    const payload: AlertEventPayload = {
-      title: `${metricName} Alert Resolved - ${threshold.description}`,
-      description: `The ${metricName} alert for ${threshold.description} has been resolved and is now within normal thresholds.`,
-      deduplication_key: deduplicationKey,
-      status: 'resolved',
-      metadata: {
-        ...this.config.metadata,
-        priority: this.mapPriorityToIncidentIo(threshold.priority),
-        group_key: groupKey,
-        metric_type: metricType,
-        metric_name: metricName,
-        threshold_priority: threshold.priority,
-      },
-      source_url: window.location.href,
-    };
-
     try {
+      const deduplicationKey = this.generateDeduplicationKey(metricName, threshold.priority);
+      const groupKey = this.generateGroupKey(metricName);
+
+      const alertData = {
+        deduplication_key: deduplicationKey,
+        group_key: groupKey,
+        source_url: window.location.href,
+        title: `✅ ${threshold.priority}: ${threshold.description} - Resolved`,
+        description: `${threshold.description} resolved / Current value is ${currentValue.toFixed(1)}% on ${serviceName} - below ${threshold.priority} threshold of ${threshold.threshold}%`,
+        status: 'resolved',
+        metadata: {
+          ...this.config.metadata,
+          priority: threshold.priority.toLowerCase(),
+          group_key: groupKey,
+          metric_name: metricName,
+          current_value: currentValue,
+          threshold_value: threshold.threshold,
+          service: serviceName,
+        },
+      };
+
       const response = await fetch(
         `/api/incident-io/v2/alert_events/http/${this.config.alertSourceConfigId}`,
         {
@@ -145,7 +125,7 @@ export class IncidentIoService {
             'Authorization': `Bearer ${this.config.token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(alertData),
         }
       );
 
@@ -156,7 +136,6 @@ export class IncidentIoService {
 
       const result: AlertEventResponse = await response.json();
       console.log('Threshold alert resolved in Incident.io:', result);
-      return result;
     } catch (error) {
       console.error('Failed to resolve threshold alert in Incident.io:', error);
       throw error;

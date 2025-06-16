@@ -1,8 +1,8 @@
-import type { MetricType, AlertThreshold, AlertPriority, AlertState, ThresholdAlertState } from '../types/metrics';
+import type { AlertThreshold, AlertPriority, AlertState, ThresholdAlertState } from '../types/metrics';
 
 export interface MetricConfig {
-  id: MetricType;
   name: string;
+  displayName: string;
   unit: string;
   baseValue: number;
   variance: number;
@@ -15,10 +15,10 @@ export interface MetricConfig {
   alertThresholds: AlertThreshold[];
 }
 
-export const METRIC_CONFIGS: Record<MetricType, MetricConfig> = {
-  errorRate: {
-    id: 'errorRate',
-    name: 'Error Rate',
+export const METRIC_CONFIGS: MetricConfig[] = [
+  {
+    name: 'error_rate',
+    displayName: 'Error Rate',
     unit: '%',
     baseValue: 2,
     variance: 1,
@@ -33,9 +33,9 @@ export const METRIC_CONFIGS: Record<MetricType, MetricConfig> = {
       { priority: 'P2', threshold: 5, operator: 'greater_than', description: 'Error rate high' },
     ],
   },
-  p95ResponseTime: {
-    id: 'p95ResponseTime',
-    name: 'P95 Response Time',
+  {
+    name: 'p95_response_time',
+    displayName: 'P95 Response Time',
     unit: 'ms',
     baseValue: 150,
     variance: 50,
@@ -50,9 +50,9 @@ export const METRIC_CONFIGS: Record<MetricType, MetricConfig> = {
       { priority: 'P3', threshold: 400, operator: 'greater_than', description: 'Response times elevated' },
     ],
   },
-  cpuUsage: {
-    id: 'cpuUsage',
-    name: 'CPU Usage',
+  {
+    name: 'cpu_usage',
+    displayName: 'CPU Usage',
     unit: '%',
     baseValue: 45,
     variance: 15,
@@ -67,9 +67,9 @@ export const METRIC_CONFIGS: Record<MetricType, MetricConfig> = {
       { priority: 'P3', threshold: 75, operator: 'greater_than', description: 'CPU usage high' },
     ],
   },
-  memoryUsage: {
-    id: 'memoryUsage',
-    name: 'Memory Usage',
+  {
+    name: 'memory_usage',
+    displayName: 'Memory Usage',
     unit: '%',
     baseValue: 65,
     variance: 10,
@@ -84,27 +84,31 @@ export const METRIC_CONFIGS: Record<MetricType, MetricConfig> = {
       { priority: 'P2', threshold: 85, operator: 'greater_than', description: 'Memory usage high' },
     ],
   },
-};
+];
 
 // Helper functions to work with metric configs
-export const getMetricConfig = (metricType: MetricType): MetricConfig => {
-  return METRIC_CONFIGS[metricType];
+export const getMetricConfig = (metricName: string): MetricConfig => {
+  const config = METRIC_CONFIGS.find(config => config.name === metricName);
+  if (!config) {
+    throw new Error(`Metric config not found for: ${metricName}`);
+  }
+  return config;
 };
 
 export const getAllMetricConfigs = (): MetricConfig[] => {
-  return Object.values(METRIC_CONFIGS);
+  return METRIC_CONFIGS;
 };
 
-export const getMetricStepSizes = (metricType: MetricType) => {
-  return METRIC_CONFIGS[metricType].stepSizes;
+export const getMetricStepSizes = (metricName: string) => {
+  return getMetricConfig(metricName).stepSizes;
 };
 
-export const getMetricColor = (metricType: MetricType): string => {
-  return METRIC_CONFIGS[metricType].color;
+export const getMetricColor = (metricName: string): string => {
+  return getMetricConfig(metricName).color;
 };
 
-export const getMetricAlertThresholds = (metricType: MetricType): AlertThreshold[] => {
-  return METRIC_CONFIGS[metricType].alertThresholds;
+export const getMetricAlertThresholds = (metricName: string): AlertThreshold[] => {
+  return getMetricConfig(metricName).alertThresholds;
 };
 
 // Alert priority colors

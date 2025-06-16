@@ -1,32 +1,30 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { subMinutes, isAfter } from 'date-fns';
-import type { Metric, MetricDataPoint, MetricStats, MetricType, IncidentIoConfig, AlertThreshold, AlertState, ThresholdAlertState } from '../types/metrics';
-import { METRIC_CONFIGS, getAllMetricConfigs, getMetricAlertThresholds } from '../config/metrics';
+import type { Metric, MetricDataPoint, MetricStats, IncidentIoConfig, AlertThreshold, AlertState, ThresholdAlertState } from '../types/metrics';
+import { METRIC_CONFIGS, getMetricConfig, getMetricAlertThresholds } from '../config/metrics';
 import { IncidentIoService } from '../services/incidentIo';
 
 const SIMULATION_INTERVAL = 1000; // 1 second
 const DATA_RETENTION_MINUTES = 15; // Keep 15 minutes of data
 
-const createInitialMetric = (metricType: MetricType): Metric => {
-  const config = METRIC_CONFIGS[metricType];
+const createInitialMetric = (metricName: string): Metric => {
+  const config = getMetricConfig(metricName);
+  const now = new Date();
+  
   return {
-    id: config.id,
-    name: config.name,
+    displayName: config.displayName,
     unit: config.unit,
-    dataPoints: [],
+    dataPoints: [{ timestamp: now, value: config.baseValue }],
     stats: {
-      current: 0,
-      rolling1Min: { avg: 0, min: 0, max: 0 },
-      rolling5Min: { avg: 0, min: 0, max: 0 },
-      rolling15Min: { avg: 0, min: 0, max: 0 },
+      current: config.baseValue,
+      rolling1Min: { avg: config.baseValue, min: config.baseValue, max: config.baseValue },
+      rolling5Min: { avg: config.baseValue, min: config.baseValue, max: config.baseValue },
+      rolling15Min: { avg: config.baseValue, min: config.baseValue, max: config.baseValue },
     },
     baseValue: config.baseValue,
     variance: config.variance,
     adjustment: 0,
-    alertState: {
-      activeThresholds: [],
-      isAlerting: false,
-    },
+    alertState: { activeThresholds: [], isAlerting: false },
   };
 };
 
@@ -73,41 +71,18 @@ const generateValue = (baseValue: number, variance: number, adjustment: number):
   return Math.max(0, value); // Ensure non-negative values
 };
 
-export const useMetricSimulator = () => {
-  const [metrics, setMetrics] = useState<Record<MetricType, Metric>>(() => {
-    const initialMetrics = {} as Record<MetricType, Metric>;
-    getAllMetricConfigs().forEach(config => {
-      initialMetrics[config.id] = createInitialMetric(config.id);
+export const useMetricSimulator = (incidentIoConfig: IncidentIoConfig) => {
+  const [metrics, setMetrics] = useState<Record<string, Metric>>(() => {
+    const initialMetrics = {} as Record<string, Metric>;
+    METRIC_CONFIGS.forEach(config => {
+      initialMetrics[config.name] = createInitialMetric(config.name);
     });
     return initialMetrics;
   });
 
-  const [incidentIoConfig, setIncidentIoConfig] = useState<IncidentIoConfig>(() => {
-    // Load from localStorage if available
-    try {
-      const saved = localStorage.getItem('alert-playground-incident-io-config');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (error) {
-      console.warn('Failed to load Incident.io config from localStorage:', error);
-    }
-    
-    // Default config
-    return {
-      enabled: false,
-      token: '',
-      alertSourceConfigId: '',
-      metadata: {
-        team: '',
-        service: '',
-      },
-    };
-  });
-
   const incidentIoService = useRef<IncidentIoService>(new IncidentIoService(incidentIoConfig));
-  const previousThresholdStates = useRef<Record<MetricType, Record<string, boolean>>>({} as Record<MetricType, Record<string, boolean>>);
-  const thresholdTimestamps = useRef<Record<MetricType, Record<string, Date>>>({} as Record<MetricType, Record<string, Date>>);
+  const previousThresholdStates = useRef<Record<string, Record<string, boolean>>>({} as Record<string, Record<string, boolean>>);
+  const thresholdTimestamps = useRef<Record<string, Record<string, Date>>>({} as Record<string, Record<string, Date>>);
 
   // Update service when config changes
   useEffect(() => {
@@ -119,76 +94,76 @@ export const useMetricSimulator = () => {
     return dataPoints.filter(point => isAfter(point.timestamp, cutoff));
   }, []);
 
-  const handleThresholdStateChanges = useCallback(async (
-    metricType: MetricType,
-    metric: Metric,
-    currentValue: number
-  ) => {
-    const thresholds = getMetricAlertThresholds(metricType);
-    const previousStates = previousThresholdStates.current[metricType] || {};
-    const currentStates: Record<string, boolean> = {};
-    const timestamps = thresholdTimestamps.current[metricType] || {};
-
-    // Check each threshold independently
-    for (const threshold of thresholds) {
-      const thresholdKey = `${threshold.priority}-${threshold.threshold}`;
-      const isCurrentlyTriggered = threshold.operator === 'greater_than' 
-        ? currentValue > threshold.threshold 
-        : currentValue < threshold.threshold;
+  const handleThresholdStateChanges = useCallback(
+    async (
+      metricName: string,
+      currentValue: number
+    ) => {
+      const thresholds = getMetricAlertThresholds(metricName);
+      const previousStates = previousThresholdStates.current[metricName] || {};
       
-      const wasPreviouslyTriggered = previousStates[thresholdKey] || false;
-      currentStates[thresholdKey] = isCurrentlyTriggered;
+      const timestamps = thresholdTimestamps.current[metricName] || {};
+      const serviceName = incidentIoConfig.metadata.service || 'demo-service';
 
-      // Handle state changes for this specific threshold
-      if (isCurrentlyTriggered && !wasPreviouslyTriggered) {
-        // Threshold just crossed - record timestamp and post alert
-        const triggeredAt = new Date();
-        timestamps[thresholdKey] = triggeredAt;
+      const currentStates: Record<string, boolean> = {};
+
+      // Check each threshold independently
+      for (const threshold of thresholds) {
+        const thresholdKey = `${threshold.priority}-${threshold.threshold}`;
+        const isCurrentlyTriggered = threshold.operator === 'greater_than' 
+          ? currentValue > threshold.threshold 
+          : currentValue < threshold.threshold;
         
-        try {
-          const thresholdAlert = {
-            threshold,
-            isTriggered: true,
-            triggeredAt,
-          };
-          await incidentIoService.current.postThresholdAlert(
-            metricType,
-            metric.name,
-            thresholdAlert,
-            currentValue,
-            metric.unit
-          );
-        } catch (error) {
-          console.error(`Failed to post threshold alert for ${metricType} ${threshold.priority}:`, error);
-        }
-      } else if (!isCurrentlyTriggered && wasPreviouslyTriggered) {
-        // Threshold just uncrossed - remove timestamp and resolve alert
-        delete timestamps[thresholdKey];
-        
-        try {
-          await incidentIoService.current.resolveThresholdAlert(
-            metricType,
-            metric.name,
-            threshold
-          );
-        } catch (error) {
-          console.error(`Failed to resolve threshold alert for ${metricType} ${threshold.priority}:`, error);
+        const wasPreviouslyTriggered = previousStates[thresholdKey] || false;
+        currentStates[thresholdKey] = isCurrentlyTriggered;
+
+        // Handle state changes for this specific threshold
+        if (isCurrentlyTriggered && !wasPreviouslyTriggered) {
+          // Threshold just crossed - record timestamp and post alert
+          const triggeredAt = new Date();
+          timestamps[thresholdKey] = triggeredAt;
+          
+          try {
+            await incidentIoService.current.postThresholdAlert(
+              metricName,
+              threshold,
+              currentValue,
+              serviceName
+            );
+          } catch (error) {
+            console.error(`Failed to post threshold alert for ${metricName} ${threshold.priority}:`, error);
+          }
+        } else if (!isCurrentlyTriggered && wasPreviouslyTriggered) {
+          // Threshold just uncrossed - remove timestamp and resolve alert
+          delete timestamps[thresholdKey];
+          
+          try {
+            await incidentIoService.current.resolveThresholdAlert(
+              metricName,
+              threshold,
+              currentValue,
+              serviceName
+            );
+          } catch (error) {
+            console.error(`Failed to resolve threshold alert for ${metricName} ${threshold.priority}:`, error);
+          }
         }
       }
-    }
 
-    // Update previous states and timestamps
-    previousThresholdStates.current[metricType] = currentStates;
-    thresholdTimestamps.current[metricType] = timestamps;
-  }, []);
+      // Update previous states and timestamps
+      previousThresholdStates.current[metricName] = currentStates;
+      thresholdTimestamps.current[metricName] = timestamps;
+    },
+    [incidentIoConfig]
+  );
 
   const evaluateAlertStateWithTimestamps = useCallback((
-    metricType: MetricType,
+    metricName: string,
     value: number,
     thresholds: AlertThreshold[]
   ): AlertState => {
     const activeThresholds: ThresholdAlertState[] = [];
-    const timestamps = thresholdTimestamps.current[metricType] || {};
+    const timestamps = thresholdTimestamps.current[metricName] || {};
 
     // Check each threshold independently
     for (const threshold of thresholds) {
@@ -221,8 +196,8 @@ export const useMetricSimulator = () => {
       const updatedMetrics = { ...prevMetrics };
       
       Object.keys(updatedMetrics).forEach(key => {
-        const metricType = key as MetricType;
-        const metric = updatedMetrics[metricType];
+        const metricName = key;
+        const metric = updatedMetrics[metricName];
         
         // Generate new value
         const newValue = generateValue(metric.baseValue, metric.variance, metric.adjustment);
@@ -240,10 +215,10 @@ export const useMetricSimulator = () => {
         const newStats = calculateStats(cleanedDataPoints, now);
         
         // Evaluate alert state with persistent timestamps
-        const thresholds = getMetricAlertThresholds(metricType);
-        const alertState = evaluateAlertStateWithTimestamps(metricType, newValue, thresholds);
+        const thresholds = getMetricAlertThresholds(metricName);
+        const alertState = evaluateAlertStateWithTimestamps(metricName, newValue, thresholds);
         
-        updatedMetrics[metricType] = {
+        updatedMetrics[metricName] = {
           ...metric,
           dataPoints: cleanedDataPoints,
           stats: newStats,
@@ -251,39 +226,28 @@ export const useMetricSimulator = () => {
         };
 
         // Handle alert state changes (async, don't block UI)
-        handleThresholdStateChanges(metricType, metric, newValue);
+        handleThresholdStateChanges(metricName, newValue);
       });
       
       return updatedMetrics;
     });
   }, [cleanupOldData, handleThresholdStateChanges, evaluateAlertStateWithTimestamps]);
 
-  const adjustMetric = useCallback((metricType: MetricType, adjustment: number) => {
+  const adjustMetric = useCallback((metricName: string, adjustment: number) => {
     setMetrics(prevMetrics => ({
       ...prevMetrics,
-      [metricType]: {
-        ...prevMetrics[metricType],
+      [metricName]: {
+        ...prevMetrics[metricName],
         adjustment,
       },
     }));
   }, []);
 
-  const getMetricHistory = useCallback((metricType: MetricType, minutes: number): MetricDataPoint[] => {
-    const now = new Date();
-    const cutoff = subMinutes(now, minutes);
-    return metrics[metricType].dataPoints.filter(point => isAfter(point.timestamp, cutoff));
-  }, [metrics]);
-
-  const updateIncidentIoConfig = useCallback((config: IncidentIoConfig) => {
-    setIncidentIoConfig(config);
+  const getMetricHistory = useCallback((metricName: string, minutes: number): MetricDataPoint[] => {
+    const cutoff = subMinutes(new Date(), minutes);
     
-    // Persist to localStorage
-    try {
-      localStorage.setItem('alert-playground-incident-io-config', JSON.stringify(config));
-    } catch (error) {
-      console.warn('Failed to save Incident.io config to localStorage:', error);
-    }
-  }, []);
+    return metrics[metricName].dataPoints.filter(point => isAfter(point.timestamp, cutoff));
+  }, [metrics]);
 
   // Start simulation
   useEffect(() => {
@@ -295,7 +259,5 @@ export const useMetricSimulator = () => {
     metrics,
     adjustMetric,
     getMetricHistory,
-    incidentIoConfig,
-    updateIncidentIoConfig,
   };
 }; 

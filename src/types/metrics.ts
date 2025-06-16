@@ -61,8 +61,7 @@ export interface IncidentIoConfig {
 }
 
 export interface Metric {
-  id: string;
-  name: string;
+  displayName: string;
   unit: string;
   dataPoints: MetricDataPoint[];
   stats: MetricStats;
@@ -70,6 +69,4 @@ export interface Metric {
   variance: number;
   adjustment: number; // For manual adjustments
   alertState: AlertState;
-}
-
-export type MetricType = 'errorRate' | 'p95ResponseTime' | 'cpuUsage' | 'memoryUsage'; 
+} 

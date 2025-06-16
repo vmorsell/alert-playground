@@ -1,9 +1,9 @@
-import { useMetricSimulator } from '../hooks/useMetricSimulator';
+import React from 'react';
 import { MetricChart } from './MetricChart';
 import { MetricStatsDisplay } from './MetricStats';
 import { IncidentIoConfigComponent } from './IncidentIoConfig';
-import type { MetricType } from '../types/metrics';
 import { getMetricConfig, getMetricStepSizes, getAlertColor, ALERT_COLORS } from '../config/metrics';
+import type { Metric, IncidentIoConfig } from '../types/metrics';
 
 const formatDuration = (startTime: Date): string => {
   const now = new Date();
@@ -23,16 +23,26 @@ const formatDuration = (startTime: Date): string => {
   }
 };
 
-export const MetricDashboard: React.FC = () => {
-  const { metrics, adjustMetric, incidentIoConfig, updateIncidentIoConfig } = useMetricSimulator();
+interface MetricDashboardProps {
+  metrics: Record<string, Metric>;
+  adjustMetric: (metricName: string, adjustment: number) => void;
+  incidentIoConfig: IncidentIoConfig;
+  updateIncidentIoConfig: (config: IncidentIoConfig) => void;
+}
 
-  const handleAdjustment = (metricType: MetricType, delta: number) => {
-    const currentAdjustment = metrics[metricType].adjustment;
-    adjustMetric(metricType, currentAdjustment + delta);
+export const MetricDashboard: React.FC<MetricDashboardProps> = ({
+  metrics,
+  adjustMetric,
+  incidentIoConfig,
+  updateIncidentIoConfig,
+}) => {
+  const handleAdjustment = (metricName: string, delta: number) => {
+    const currentAdjustment = metrics[metricName].adjustment;
+    adjustMetric(metricName, currentAdjustment + delta);
   };
 
-  const resetAdjustment = (metricType: MetricType) => {
-    adjustMetric(metricType, 0);
+  const resetAdjustment = (metricName: string) => {
+    adjustMetric(metricName, 0);
   };
 
   return (
@@ -52,16 +62,16 @@ export const MetricDashboard: React.FC = () => {
         
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-4">
           {Object.entries(metrics).map(([key, metric]) => {
-            const metricType = key as MetricType;
-            const config = getMetricConfig(metricType);
-            const steps = getMetricStepSizes(metricType);
+            const metricName = key;
+            const config = getMetricConfig(metricName);
+            const steps = getMetricStepSizes(metricName);
             const currentAdjustment = metric.adjustment;
             const alertColor = getAlertColor(metric.alertState);
             const isAlerting = metric.alertState.isAlerting;
             
             return (
               <div 
-                key={metricType} 
+                key={metricName} 
                 className={`bg-white rounded-lg shadow-sm border-2 p-4 transition-all duration-300 ${
                   isAlerting 
                     ? 'border-current shadow-lg' 
@@ -112,7 +122,7 @@ export const MetricDashboard: React.FC = () => {
                     <div className="flex items-center gap-1">
                       {/* Large decrease */}
                       <button
-                        onClick={() => handleAdjustment(metricType, -steps.large)}
+                        onClick={() => handleAdjustment(metricName, -steps.large)}
                         className="px-2 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors"
                         title={`Decrease by ${steps.large} ${config.unit}`}
                       >
@@ -121,7 +131,7 @@ export const MetricDashboard: React.FC = () => {
                       
                       {/* Small decrease */}
                       <button
-                        onClick={() => handleAdjustment(metricType, -steps.small)}
+                        onClick={() => handleAdjustment(metricName, -steps.small)}
                         className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors"
                         title={`Decrease by ${steps.small} ${config.unit}`}
                       >
@@ -130,7 +140,7 @@ export const MetricDashboard: React.FC = () => {
                       
                       {/* Reset */}
                       <button
-                        onClick={() => resetAdjustment(metricType)}
+                        onClick={() => resetAdjustment(metricName)}
                         className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors"
                         title="Reset to baseline"
                       >
@@ -139,7 +149,7 @@ export const MetricDashboard: React.FC = () => {
                       
                       {/* Small increase */}
                       <button
-                        onClick={() => handleAdjustment(metricType, steps.small)}
+                        onClick={() => handleAdjustment(metricName, steps.small)}
                         className="px-2 py-1 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded hover:bg-green-100 transition-colors"
                         title={`Increase by ${steps.small} ${config.unit}`}
                       >
@@ -148,7 +158,7 @@ export const MetricDashboard: React.FC = () => {
                       
                       {/* Large increase */}
                       <button
-                        onClick={() => handleAdjustment(metricType, steps.large)}
+                        onClick={() => handleAdjustment(metricName, steps.large)}
                         className="px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100 transition-colors"
                         title={`Increase by ${steps.large} ${config.unit}`}
                       >
