@@ -1,4 +1,4 @@
-import type { MetricType, AlertThreshold, AlertPriority, AlertState } from '../types/metrics';
+import type { MetricType, AlertThreshold, AlertPriority, AlertState, ThresholdAlertState } from '../types/metrics';
 
 export interface MetricConfig {
   id: MetricType;
@@ -120,37 +120,37 @@ export const NORMAL_COLOR = '#10b981'; // Green-500 - Normal state
 
 // Utility function to evaluate alert state
 export const evaluateAlertState = (value: number, thresholds: AlertThreshold[]): AlertState => {
-  // Sort thresholds by priority (P0 is highest priority)
-  const sortedThresholds = [...thresholds].sort((a, b) => {
-    const priorityOrder = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
-    return priorityOrder[a.priority] - priorityOrder[b.priority];
-  });
+  const activeThresholds: ThresholdAlertState[] = [];
 
-  // Check each threshold starting with highest priority
-  for (const threshold of sortedThresholds) {
+  // Check each threshold independently
+  for (const threshold of thresholds) {
     const isTriggered = threshold.operator === 'greater_than' 
       ? value > threshold.threshold 
       : value < threshold.threshold;
     
     if (isTriggered) {
-      return {
-        isAlerting: true,
-        activePriority: threshold.priority,
-        triggeredThreshold: threshold,
+      activeThresholds.push({
+        threshold,
+        isTriggered: true,
         triggeredAt: new Date(),
-      };
+      });
     }
   }
 
   return {
-    isAlerting: false,
+    activeThresholds,
+    isAlerting: activeThresholds.length > 0,
   };
 };
 
 // Get color based on alert state
 export const getAlertColor = (alertState: AlertState): string => {
-  if (alertState.isAlerting && alertState.activePriority) {
-    return ALERT_COLORS[alertState.activePriority];
+  if (alertState.isAlerting && alertState.activeThresholds.length > 0) {
+    // Return the color of the highest priority active threshold
+    const priorities = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
+    const highestPriorityThreshold = alertState.activeThresholds
+      .sort((a, b) => priorities[a.threshold.priority] - priorities[b.threshold.priority])[0];
+    return ALERT_COLORS[highestPriorityThreshold.threshold.priority];
   }
   return NORMAL_COLOR;
 }; 

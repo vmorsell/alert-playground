@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { subMinutes, isAfter } from 'date-fns';
-import type { Metric, MetricDataPoint, MetricStats, MetricType, IncidentIoConfig } from '../types/metrics';
+import type { Metric, MetricDataPoint, MetricStats, MetricType, IncidentIoConfig, AlertThreshold, AlertState, ThresholdAlertState } from '../types/metrics';
 import { METRIC_CONFIGS, getAllMetricConfigs, getMetricAlertThresholds, evaluateAlertState } from '../config/metrics';
 import { IncidentIoService } from '../services/incidentIo';
 
@@ -24,6 +24,7 @@ const createInitialMetric = (metricType: MetricType): Metric => {
     variance: config.variance,
     adjustment: 0,
     alertState: {
+      activeThresholds: [],
       isAlerting: false,
     },
   };
@@ -105,7 +106,8 @@ export const useMetricSimulator = () => {
   });
 
   const incidentIoService = useRef<IncidentIoService>(new IncidentIoService(incidentIoConfig));
-  const previousAlertStates = useRef<Record<MetricType, { isAlerting: boolean; activePriority?: string }>>({} as any);
+  const previousThresholdStates = useRef<Record<MetricType, Record<string, boolean>>>({} as any);
+  const thresholdTimestamps = useRef<Record<MetricType, Record<string, Date>>>({} as any);
 
   // Update service when config changes
   useEffect(() => {
@@ -117,72 +119,99 @@ export const useMetricSimulator = () => {
     return dataPoints.filter(point => isAfter(point.timestamp, cutoff));
   }, []);
 
-  const handleAlertStateChange = useCallback(async (
+  const handleThresholdStateChanges = useCallback(async (
     metricType: MetricType,
     metric: Metric,
-    newAlertState: any,
     currentValue: number
   ) => {
-    const previousState = previousAlertStates.current[metricType];
-    const currentState = {
-      isAlerting: newAlertState.isAlerting,
-      activePriority: newAlertState.activePriority,
-    };
+    const thresholds = getMetricAlertThresholds(metricType);
+    const previousStates = previousThresholdStates.current[metricType] || {};
+    const currentStates: Record<string, boolean> = {};
+    const timestamps = thresholdTimestamps.current[metricType] || {};
 
-    // Check if alert state changed
-    const stateChanged = !previousState || 
-      previousState.isAlerting !== currentState.isAlerting ||
-      previousState.activePriority !== currentState.activePriority;
+    // Check each threshold independently
+    for (const threshold of thresholds) {
+      const thresholdKey = `${threshold.priority}-${threshold.threshold}`;
+      const isCurrentlyTriggered = threshold.operator === 'greater_than' 
+        ? currentValue > threshold.threshold 
+        : currentValue < threshold.threshold;
+      
+      const wasPreviouslyTriggered = previousStates[thresholdKey] || false;
+      currentStates[thresholdKey] = isCurrentlyTriggered;
 
-    if (stateChanged) {
-      try {
-        // Handle different transition scenarios
-        if (previousState?.isAlerting && previousState.activePriority) {
-          // There was a previous alert
-          if (currentState.isAlerting && currentState.activePriority) {
-            // Priority changed (e.g., P0 -> P2)
-            if (previousState.activePriority !== currentState.activePriority) {
-              // Resolve the previous alert
-              await incidentIoService.current.resolveAlert(
-                metricType,
-                metric.name,
-                previousState.activePriority
-              );
-              
-              // Post the new alert
-              await incidentIoService.current.postAlert(
-                metricType,
-                metric.name,
-                newAlertState,
-                currentValue,
-                metric.unit
-              );
-            }
-          } else {
-            // Alert completely resolved (no longer alerting)
-            await incidentIoService.current.resolveAlert(
-              metricType,
-              metric.name,
-              previousState.activePriority
-            );
-          }
-        } else if (currentState.isAlerting && currentState.activePriority) {
-          // New alert (no previous alert was active)
-          await incidentIoService.current.postAlert(
+      // Handle state changes for this specific threshold
+      if (isCurrentlyTriggered && !wasPreviouslyTriggered) {
+        // Threshold just crossed - record timestamp and post alert
+        const triggeredAt = new Date();
+        timestamps[thresholdKey] = triggeredAt;
+        
+        try {
+          const thresholdAlert = {
+            threshold,
+            isTriggered: true,
+            triggeredAt,
+          };
+          await incidentIoService.current.postThresholdAlert(
             metricType,
             metric.name,
-            newAlertState,
+            thresholdAlert,
             currentValue,
             metric.unit
           );
+        } catch (error) {
+          console.error(`Failed to post threshold alert for ${metricType} ${threshold.priority}:`, error);
         }
-      } catch (error) {
-        console.error(`Failed to handle alert state change for ${metricType}:`, error);
+      } else if (!isCurrentlyTriggered && wasPreviouslyTriggered) {
+        // Threshold just uncrossed - remove timestamp and resolve alert
+        delete timestamps[thresholdKey];
+        
+        try {
+          await incidentIoService.current.resolveThresholdAlert(
+            metricType,
+            metric.name,
+            threshold
+          );
+        } catch (error) {
+          console.error(`Failed to resolve threshold alert for ${metricType} ${threshold.priority}:`, error);
+        }
       }
-
-      // Update previous state
-      previousAlertStates.current[metricType] = currentState;
     }
+
+    // Update previous states and timestamps
+    previousThresholdStates.current[metricType] = currentStates;
+    thresholdTimestamps.current[metricType] = timestamps;
+  }, []);
+
+  const evaluateAlertStateWithTimestamps = useCallback((
+    metricType: MetricType,
+    value: number,
+    thresholds: AlertThreshold[]
+  ): AlertState => {
+    const activeThresholds: ThresholdAlertState[] = [];
+    const timestamps = thresholdTimestamps.current[metricType] || {};
+
+    // Check each threshold independently
+    for (const threshold of thresholds) {
+      const isTriggered = threshold.operator === 'greater_than' 
+        ? value > threshold.threshold 
+        : value < threshold.threshold;
+      
+      if (isTriggered) {
+        const thresholdKey = `${threshold.priority}-${threshold.threshold}`;
+        const triggeredAt = timestamps[thresholdKey] || new Date(); // Fallback to now if not tracked
+        
+        activeThresholds.push({
+          threshold,
+          isTriggered: true,
+          triggeredAt,
+        });
+      }
+    }
+
+    return {
+      activeThresholds,
+      isAlerting: activeThresholds.length > 0,
+    };
   }, []);
 
   const updateMetrics = useCallback(() => {
@@ -210,9 +239,9 @@ export const useMetricSimulator = () => {
         // Calculate new stats
         const newStats = calculateStats(cleanedDataPoints, now);
         
-        // Evaluate alert state
+        // Evaluate alert state with persistent timestamps
         const thresholds = getMetricAlertThresholds(metricType);
-        const alertState = evaluateAlertState(newValue, thresholds);
+        const alertState = evaluateAlertStateWithTimestamps(metricType, newValue, thresholds);
         
         updatedMetrics[metricType] = {
           ...metric,
@@ -222,12 +251,12 @@ export const useMetricSimulator = () => {
         };
 
         // Handle alert state changes (async, don't block UI)
-        handleAlertStateChange(metricType, metric, alertState, newValue);
+        handleThresholdStateChanges(metricType, metric, newValue);
       });
       
       return updatedMetrics;
     });
-  }, [cleanupOldData, handleAlertStateChange]);
+  }, [cleanupOldData, handleThresholdStateChanges, evaluateAlertStateWithTimestamps]);
 
   const adjustMetric = useCallback((metricType: MetricType, adjustment: number) => {
     setMetrics(prevMetrics => ({

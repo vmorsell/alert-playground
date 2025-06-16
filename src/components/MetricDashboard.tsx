@@ -5,6 +5,24 @@ import { IncidentIoConfigComponent } from './IncidentIoConfig';
 import type { MetricType } from '../types/metrics';
 import { getMetricConfig, getMetricStepSizes, getAlertColor, ALERT_COLORS } from '../config/metrics';
 
+const formatDuration = (startTime: Date): string => {
+  const now = new Date();
+  const diffMs = now.getTime() - startTime.getTime();
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffHours = Math.floor(diffMinutes / 60);
+
+  if (diffHours > 0) {
+    const remainingMinutes = diffMinutes % 60;
+    return `${diffHours}h ${remainingMinutes}m`;
+  } else if (diffMinutes > 0) {
+    const remainingSeconds = diffSeconds % 60;
+    return `${diffMinutes}m ${remainingSeconds}s`;
+  } else {
+    return `${diffSeconds}s`;
+  }
+};
+
 export const MetricDashboard: React.FC = () => {
   const { metrics, adjustMetric, incidentIoConfig, updateIncidentIoConfig } = useMetricSimulator();
 
@@ -61,13 +79,24 @@ export const MetricDashboard: React.FC = () => {
                       )}
                     </div>
                     
-                    {/* Alert Priority Badge */}
-                    {isAlerting && metric.alertState.activePriority && (
-                      <div 
-                        className="px-2 py-1 rounded-full text-xs font-bold text-white shadow-sm"
-                        style={{ backgroundColor: alertColor }}
-                      >
-                        {metric.alertState.activePriority}
+                    {/* Alert Priority Badge - Show only highest priority */}
+                    {isAlerting && metric.alertState.activeThresholds.length > 0 && (
+                      <div className="flex gap-1">
+                        {(() => {
+                          // Get the highest priority threshold (lowest number = highest priority)
+                          const priorities = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
+                          const highestPriorityThreshold = metric.alertState.activeThresholds
+                            .sort((a, b) => priorities[a.threshold.priority] - priorities[b.threshold.priority])[0];
+                          
+                          return (
+                            <div 
+                              className="px-2 py-1 rounded-full text-xs font-bold text-white shadow-sm"
+                              style={{ backgroundColor: ALERT_COLORS[highestPriorityThreshold.threshold.priority] }}
+                            >
+                              {highestPriorityThreshold.threshold.priority}
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
@@ -129,25 +158,43 @@ export const MetricDashboard: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Alert Description */}
-                {isAlerting && metric.alertState.triggeredThreshold && (
-                  <div 
-                    className="mb-4 p-2 rounded-md text-sm font-medium"
-                    style={{ 
-                      backgroundColor: `${alertColor}15`,
-                      color: alertColor,
-                      border: `1px solid ${alertColor}30`
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>🚨 {metric.alertState.triggeredThreshold.description}</span>
-                      {incidentIoConfig.enabled && (
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                          📡 Incident.io
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                {/* Alert Description - Show only highest priority */}
+                {isAlerting && metric.alertState.activeThresholds.length > 0 && (
+                  (() => {
+                    // Get the highest priority threshold (lowest number = highest priority)
+                    const priorities = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
+                    const highestPriorityThreshold = metric.alertState.activeThresholds
+                      .sort((a, b) => priorities[a.threshold.priority] - priorities[b.threshold.priority])[0];
+                    
+                    return (
+                      <div 
+                        className="mb-4 p-2 rounded-md text-sm font-medium"
+                        style={{ 
+                          backgroundColor: `${ALERT_COLORS[highestPriorityThreshold.threshold.priority]}15`,
+                          color: ALERT_COLORS[highestPriorityThreshold.threshold.priority],
+                          border: `1px solid ${ALERT_COLORS[highestPriorityThreshold.threshold.priority]}30`
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-semibold">
+                              🚨 {highestPriorityThreshold.threshold.priority}: {highestPriorityThreshold.threshold.description}
+                            </div>
+                          </div>
+                          <div className="flex flex-row items-end gap-1">
+                            <div 
+                              className="px-2 py-1 rounded-full text-xs font-medium text-white min-w-[80px] text-center"
+                              style={{
+                                backgroundColor: ALERT_COLORS[highestPriorityThreshold.threshold.priority]
+                              }}
+                            >
+                              {formatDuration(highestPriorityThreshold.triggeredAt!)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()
                 )}
                 
                 {/* Main content area */}

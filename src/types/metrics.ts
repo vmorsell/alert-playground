@@ -38,6 +38,17 @@ export interface AlertState {
   triggeredAt?: Date;
 }
 
+export interface ThresholdAlertState {
+  threshold: AlertThreshold;
+  isTriggered: boolean;
+  triggeredAt?: Date;
+}
+
+export interface AlertState {
+  activeThresholds: ThresholdAlertState[];
+  isAlerting: boolean; // true if any threshold is triggered
+}
+
 export interface IncidentIoConfig {
   enabled: boolean;
   token: string;

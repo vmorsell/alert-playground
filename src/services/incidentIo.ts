@@ -1,4 +1,4 @@
-import type { IncidentIoConfig, AlertState, AlertThreshold, MetricType } from '../types/metrics';
+import type { IncidentIoConfig, AlertThreshold, MetricType, ThresholdAlertState } from '../types/metrics';
 
 interface AlertEventPayload {
   title: string;
@@ -46,10 +46,10 @@ export class IncidentIoService {
     return priority.toLowerCase();
   }
 
-  async postAlert(
+  async postThresholdAlert(
     metricType: MetricType,
     metricName: string,
-    alertState: AlertState,
+    thresholdAlert: ThresholdAlertState,
     currentValue: number,
     unit: string
   ): Promise<AlertEventResponse | null> {
@@ -58,27 +58,24 @@ export class IncidentIoService {
       return null;
     }
 
-    if (!alertState.isAlerting || !alertState.activePriority || !alertState.triggeredThreshold) {
-      console.log('No active alert to post');
-      return null;
-    }
-
-    const deduplicationKey = this.generateDeduplicationKey(metricType, alertState.activePriority);
+    const threshold = thresholdAlert.threshold;
+    const deduplicationKey = this.generateDeduplicationKey(metricType, threshold.priority);
     const groupKey = this.generateGroupKey(metricType);
 
     const payload: AlertEventPayload = {
-      title: `${metricName} Alert - ${alertState.triggeredThreshold.description}`,
-      description: `**Metric:** ${metricName}\n**Current Value:** ${currentValue.toFixed(2)} ${unit}\n**Threshold:** ${alertState.triggeredThreshold.threshold} ${unit}\n**Priority:** ${alertState.activePriority}\n\n${alertState.triggeredThreshold.description}`,
+      title: `${metricName} Alert - ${threshold.description}`,
+      description: `**Metric:** ${metricName}\n**Current Value:** ${currentValue.toFixed(2)} ${unit}\n**Threshold:** ${threshold.threshold} ${unit}\n**Priority:** ${threshold.priority}\n\n${threshold.description}`,
       deduplication_key: deduplicationKey,
       status: 'firing',
       metadata: {
         ...this.config.metadata,
-        priority: this.mapPriorityToIncidentIo(alertState.activePriority),
+        priority: this.mapPriorityToIncidentIo(threshold.priority),
         group_key: groupKey,
         metric_type: metricType,
         metric_name: metricName,
         current_value: currentValue.toString(),
-        threshold_value: alertState.triggeredThreshold.threshold.toString(),
+        threshold_value: threshold.threshold.toString(),
+        threshold_priority: threshold.priority,
         unit: unit,
       },
       source_url: window.location.href,
@@ -103,37 +100,38 @@ export class IncidentIoService {
       }
 
       const result: AlertEventResponse = await response.json();
-      console.log('Alert posted to Incident.io:', result);
+      console.log('Threshold alert posted to Incident.io:', result);
       return result;
     } catch (error) {
-      console.error('Failed to post alert to Incident.io:', error);
+      console.error('Failed to post threshold alert to Incident.io:', error);
       throw error;
     }
   }
 
-  async resolveAlert(
+  async resolveThresholdAlert(
     metricType: MetricType,
     metricName: string,
-    priority: string
+    threshold: AlertThreshold
   ): Promise<AlertEventResponse | null> {
     if (!this.config.enabled || !this.config.token || !this.config.alertSourceConfigId) {
       return null;
     }
 
-    const deduplicationKey = this.generateDeduplicationKey(metricType, priority);
+    const deduplicationKey = this.generateDeduplicationKey(metricType, threshold.priority);
     const groupKey = this.generateGroupKey(metricType);
 
     const payload: AlertEventPayload = {
-      title: `${metricName} Alert Resolved`,
-      description: `The ${metricName} alert has been resolved and is now within normal thresholds.`,
+      title: `${metricName} Alert Resolved - ${threshold.description}`,
+      description: `The ${metricName} alert for ${threshold.description} has been resolved and is now within normal thresholds.`,
       deduplication_key: deduplicationKey,
       status: 'resolved',
       metadata: {
         ...this.config.metadata,
-        priority: this.mapPriorityToIncidentIo(priority),
+        priority: this.mapPriorityToIncidentIo(threshold.priority),
         group_key: groupKey,
         metric_type: metricType,
         metric_name: metricName,
+        threshold_priority: threshold.priority,
       },
       source_url: window.location.href,
     };
@@ -157,10 +155,10 @@ export class IncidentIoService {
       }
 
       const result: AlertEventResponse = await response.json();
-      console.log('Alert resolved in Incident.io:', result);
+      console.log('Threshold alert resolved in Incident.io:', result);
       return result;
     } catch (error) {
-      console.error('Failed to resolve alert in Incident.io:', error);
+      console.error('Failed to resolve threshold alert in Incident.io:', error);
       throw error;
     }
   }
