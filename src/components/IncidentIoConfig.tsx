@@ -12,9 +12,22 @@ export const IncidentIoConfigComponent: React.FC<IncidentIoConfigProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [localConfig, setLocalConfig] = useState(config);
+  const [hasStoredConfig] = useState(() => {
+    try {
+      return localStorage.getItem('alert-playground-incident-io-config') !== null;
+    } catch {
+      return false;
+    }
+  });
 
   const handleSave = () => {
     onConfigChange(localConfig);
+    setIsExpanded(false);
+  };
+
+  const handleSaveAndEnable = () => {
+    const enabledConfig = { ...localConfig, enabled: true };
+    onConfigChange(enabledConfig);
     setIsExpanded(false);
   };
 
@@ -54,13 +67,25 @@ export const IncidentIoConfigComponent: React.FC<IncidentIoConfigProps> = ({
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h3 className="text-lg font-semibold text-gray-900">Incident.io Integration</h3>
-          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-            config.enabled 
-              ? 'bg-green-100 text-green-800' 
-              : 'bg-gray-100 text-gray-600'
-          }`}>
-            {config.enabled ? 'Enabled' : 'Disabled'}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Incident.io Integration</h3>
+          </div>
+          
+          {/* Status Badges */}
+          <div className="flex items-center gap-2">
+            <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+              config.enabled 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-gray-100 text-gray-600'
+            }`}>
+              {config.enabled ? 'Enabled' : 'Disabled'}
+            </div>
+            
+            {hasStoredConfig && (
+              <div className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-600" title="Configuration loaded from browser storage">
+                💾 Saved
+              </div>
+            )}
           </div>
         </div>
         
@@ -177,14 +202,23 @@ export const IncidentIoConfigComponent: React.FC<IncidentIoConfigProps> = ({
           {/* Action Buttons */}
           <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
             <button
-              onClick={handleSave}
+              onClick={handleSaveAndEnable}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors"
+              title="Save configuration and enable Incident.io integration"
             >
-              Save Configuration
+              Save & Enable
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors"
+              title="Save configuration without changing enabled status"
+            >
+              Save Only
             </button>
             <button
               onClick={handleCancel}
               className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+              title="Discard changes and close"
             >
               Cancel
             </button>
