@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { subMinutes, isAfter } from 'date-fns';
 import type { Metric, MetricDataPoint, MetricStats, MetricType } from '../types/metrics';
-import { METRIC_CONFIGS, getAllMetricConfigs } from '../config/metrics';
+import { METRIC_CONFIGS, getAllMetricConfigs, getMetricAlertThresholds, evaluateAlertState } from '../config/metrics';
 
 const SIMULATION_INTERVAL = 1000; // 1 second
 const DATA_RETENTION_MINUTES = 15; // Keep 15 minutes of data
@@ -22,6 +22,9 @@ const createInitialMetric = (metricType: MetricType): Metric => {
     baseValue: config.baseValue,
     variance: config.variance,
     adjustment: 0,
+    alertState: {
+      isAlerting: false,
+    },
   };
 };
 
@@ -107,10 +110,15 @@ export const useMetricSimulator = () => {
         // Calculate new stats
         const newStats = calculateStats(cleanedDataPoints, now);
         
+        // Evaluate alert state
+        const thresholds = getMetricAlertThresholds(metricType);
+        const alertState = evaluateAlertState(newValue, thresholds);
+        
         updatedMetrics[metricType] = {
           ...metric,
           dataPoints: cleanedDataPoints,
           stats: newStats,
+          alertState,
         };
       });
       

@@ -2,9 +2,7 @@ import { useMetricSimulator } from '../hooks/useMetricSimulator';
 import { MetricChart } from './MetricChart';
 import { MetricStatsDisplay } from './MetricStats';
 import type { MetricType } from '../types/metrics';
-import { getMetricConfig, getMetricStepSizes } from '../config/metrics';
-
-const NORMAL_COLOR = '#10b981'; // Green for normal/non-alarming state
+import { getMetricConfig, getMetricStepSizes, getAlertColor, ALERT_COLORS } from '../config/metrics';
 
 export const MetricDashboard: React.FC = () => {
   const { metrics, adjustMetric } = useMetricSimulator();
@@ -31,15 +29,37 @@ export const MetricDashboard: React.FC = () => {
             const config = getMetricConfig(metricType);
             const steps = getMetricStepSizes(metricType);
             const currentAdjustment = metric.adjustment;
+            const alertColor = getAlertColor(metric.alertState);
+            const isAlerting = metric.alertState.isAlerting;
             
             return (
-              <div key={metricType} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                {/* Header with title and adjustment controls */}
+              <div 
+                key={metricType} 
+                className={`bg-white rounded-lg shadow-sm border-2 p-4 transition-all duration-300 ${
+                  isAlerting 
+                    ? 'border-current shadow-lg' 
+                    : 'border-gray-200'
+                }`}
+                style={{ borderColor: isAlerting ? alertColor : undefined }}
+              >
+                {/* Header with title, alert badge, and adjustment controls */}
                 <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{config.name}</h3>
-                    {config.description && (
-                      <p className="text-xs text-gray-500 mt-1">{config.description}</p>
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">{config.name}</h3>
+                      {config.description && (
+                        <p className="text-xs text-gray-500 mt-1">{config.description}</p>
+                      )}
+                    </div>
+                    
+                    {/* Alert Priority Badge */}
+                    {isAlerting && metric.alertState.activePriority && (
+                      <div 
+                        className="px-2 py-1 rounded-full text-xs font-bold text-white shadow-sm"
+                        style={{ backgroundColor: alertColor }}
+                      >
+                        {metric.alertState.activePriority}
+                      </div>
                     )}
                   </div>
                   
@@ -100,6 +120,20 @@ export const MetricDashboard: React.FC = () => {
                   </div>
                 </div>
                 
+                {/* Alert Description */}
+                {isAlerting && metric.alertState.triggeredThreshold && (
+                  <div 
+                    className="mb-4 p-2 rounded-md text-sm font-medium"
+                    style={{ 
+                      backgroundColor: `${alertColor}15`,
+                      color: alertColor,
+                      border: `1px solid ${alertColor}30`
+                    }}
+                  >
+                    🚨 {metric.alertState.triggeredThreshold.description}
+                  </div>
+                )}
+                
                 {/* Main content area */}
                 <div className="grid grid-cols-3 gap-4">
                   {/* Chart takes up 2/3 of the space */}
@@ -109,7 +143,7 @@ export const MetricDashboard: React.FC = () => {
                         title=""
                         unit={config.unit}
                         dataPoints={metric.dataPoints.slice(-120)} // Last 2 minutes
-                        color={NORMAL_COLOR}
+                        color={alertColor}
                       />
                     </div>
                   </div>
@@ -120,6 +154,7 @@ export const MetricDashboard: React.FC = () => {
                       title=""
                       unit={config.unit}
                       stats={metric.stats}
+                      alertState={metric.alertState}
                     />
                   </div>
                 </div>
