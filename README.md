@@ -1,54 +1,73 @@
-# React + TypeScript + Vite
+# Alert Playground
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A real-time metrics monitoring and alerting simulation platform with Incident.io integration. Built with React, TypeScript, and Tailwind CSS.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Real-time metrics simulation** - Error Rate, P95 Response Time, CPU Usage, Memory Usage
+- **Independent threshold alerts** - Each threshold operates as a separate alert (P0-P4 priorities)
+- **Incident.io integration** - Automatic alert posting and resolution
+- **Interactive controls** - Manual adjustment to simulate different scenarios
+- **Live charts** - Real-time visualization with threshold overlays
 
-## Expanding the ESLint configuration
+## Quick Start
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+```bash
+# Clone and install
+git clone https://github.com/vmorsell/alert-playground.git
+cd alert-playground
+npm install
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+# Start development server
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open http://localhost:5173
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Incident.io Setup
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+1. Get API token from Incident.io Settings → API Keys
+2. Create HTTP alert source and copy the Config ID
+3. Click "Configure" in the app and enter your credentials
+4. Click "Save & Enable"
+
+## Usage
+
+- **Monitor**: Watch real-time metrics on the dashboard
+- **Test**: Use +/- buttons to trigger alerts by crossing thresholds
+- **Observe**: Watch alerts fire and resolve automatically in Incident.io
+
+### Example Scenarios
+
+**High Error Rate**: Increase Error Rate → P2 fires at 5% → P0 fires at 15% → Reset to see resolution
+
+**Memory Pressure**: Increase Memory → P2 at 85% → P1 at 95% → Reset to baseline
+
+## Metrics & Thresholds
+
+| Metric | Thresholds | Description |
+|--------|------------|-------------|
+| Error Rate | P0: >15%, P2: >5% | Request error percentage |
+| P95 Response Time | P1: >1000ms, P3: >400ms | 95th percentile response times |
+| CPU Usage | P1: >90%, P3: >75% | CPU utilization |
+| Memory Usage | P1: >95%, P2: >85% | Memory utilization |
+
+## Tech Stack
+
+React 19 • TypeScript • Tailwind CSS v4 • Chart.js • Vite • Incident.io API
+
+## Development
+
+```bash
+npm run build    # Production build
+npm run lint     # Code linting
+npm run preview  # Preview build
 ```
+
+## Deployment
+
+Works on any static hosting platform (Vercel, Netlify, etc.). No server required.
+
+---
+
+**Built for testing and learning alert management systems**
