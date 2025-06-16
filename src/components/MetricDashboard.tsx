@@ -1,11 +1,12 @@
 import { useMetricSimulator } from '../hooks/useMetricSimulator';
 import { MetricChart } from './MetricChart';
 import { MetricStatsDisplay } from './MetricStats';
+import { IncidentIoConfigComponent } from './IncidentIoConfig';
 import type { MetricType } from '../types/metrics';
 import { getMetricConfig, getMetricStepSizes, getAlertColor, ALERT_COLORS } from '../config/metrics';
 
 export const MetricDashboard: React.FC = () => {
-  const { metrics, adjustMetric } = useMetricSimulator();
+  const { metrics, adjustMetric, incidentIoConfig, updateIncidentIoConfig } = useMetricSimulator();
 
   const handleAdjustment = (metricType: MetricType, delta: number) => {
     const currentAdjustment = metrics[metricType].adjustment;
@@ -22,6 +23,14 @@ export const MetricDashboard: React.FC = () => {
         <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">
           Alert Playground
         </h1>
+        
+        {/* Incident.io Configuration */}
+        <div className="mb-6">
+          <IncidentIoConfigComponent
+            config={incidentIoConfig}
+            onConfigChange={updateIncidentIoConfig}
+          />
+        </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-4">
           {Object.entries(metrics).map(([key, metric]) => {
@@ -130,7 +139,14 @@ export const MetricDashboard: React.FC = () => {
                       border: `1px solid ${alertColor}30`
                     }}
                   >
-                    🚨 {metric.alertState.triggeredThreshold.description}
+                    <div className="flex items-center justify-between">
+                      <span>🚨 {metric.alertState.triggeredThreshold.description}</span>
+                      {incidentIoConfig.enabled && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                          📡 Incident.io
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
                 

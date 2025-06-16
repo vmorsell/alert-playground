@@ -38,6 +38,17 @@ export interface AlertState {
   triggeredAt?: Date;
 }
 
+export interface IncidentIoConfig {
+  enabled: boolean;
+  token: string;
+  alertSourceConfigId: string;
+  metadata: {
+    team?: string;
+    service?: string;
+    [key: string]: any;
+  };
+}
+
 export interface Metric {
   id: string;
   name: string;

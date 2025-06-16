@@ -5,4 +5,16 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    proxy: {
+      '/api/incident-io': {
+        target: 'https://api.incident.io',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/incident-io/, ''),
+        headers: {
+          'Origin': 'https://api.incident.io'
+        }
+      }
+    }
+  }
 })
