@@ -97,7 +97,7 @@ export const MetricChart: React.FC<MetricChartProps> = ({
       },
       tooltip: {
         callbacks: {
-          label: (context: any) => {
+          label: (context: { dataset: { label?: string }; parsed: { y: number } }) => {
             const datasetLabel = context.dataset.label;
             if (datasetLabel && datasetLabel.includes('Threshold')) {
               return `${datasetLabel}: ${context.parsed.y.toFixed(2)} ${unit}`;
@@ -105,7 +105,7 @@ export const MetricChart: React.FC<MetricChartProps> = ({
             return `${context.parsed.y.toFixed(2)} ${unit}`;
           },
         },
-        filter: (tooltipItem: any) => {
+        filter: (tooltipItem: { dataset: { label?: string }; datasetIndex: number }) => {
           // Only show tooltip for the main data line when hovering over threshold lines
           return !tooltipItem.dataset.label?.includes('Threshold') || tooltipItem.datasetIndex === 0;
         },
@@ -143,8 +143,8 @@ export const MetricChart: React.FC<MetricChartProps> = ({
           font: {
             size: 10,
           },
-          callback: function(value: any) {
-            return `${value.toFixed(1)} ${unit}`;
+          callback: function(value: string | number) {
+            return `${Number(value).toFixed(1)} ${unit}`;
           },
         },
       },

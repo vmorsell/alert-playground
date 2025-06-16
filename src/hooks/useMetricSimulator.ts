@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { subMinutes, isAfter } from 'date-fns';
 import type { Metric, MetricDataPoint, MetricStats, MetricType, IncidentIoConfig, AlertThreshold, AlertState, ThresholdAlertState } from '../types/metrics';
-import { METRIC_CONFIGS, getAllMetricConfigs, getMetricAlertThresholds, evaluateAlertState } from '../config/metrics';
+import { METRIC_CONFIGS, getAllMetricConfigs, getMetricAlertThresholds } from '../config/metrics';
 import { IncidentIoService } from '../services/incidentIo';
 
 const SIMULATION_INTERVAL = 1000; // 1 second
@@ -106,8 +106,8 @@ export const useMetricSimulator = () => {
   });
 
   const incidentIoService = useRef<IncidentIoService>(new IncidentIoService(incidentIoConfig));
-  const previousThresholdStates = useRef<Record<MetricType, Record<string, boolean>>>({} as any);
-  const thresholdTimestamps = useRef<Record<MetricType, Record<string, Date>>>({} as any);
+  const previousThresholdStates = useRef<Record<MetricType, Record<string, boolean>>>({} as Record<MetricType, Record<string, boolean>>);
+  const thresholdTimestamps = useRef<Record<MetricType, Record<string, Date>>>({} as Record<MetricType, Record<string, Date>>);
 
   // Update service when config changes
   useEffect(() => {

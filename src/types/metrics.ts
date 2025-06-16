@@ -56,7 +56,7 @@ export interface IncidentIoConfig {
   metadata: {
     team?: string;
     service?: string;
-    [key: string]: any;
+    [key: string]: string | number | boolean | undefined;
   };
 }
 

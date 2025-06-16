@@ -55,10 +55,12 @@ export const IncidentIoConfigComponent: React.FC<IncidentIoConfigProps> = ({
 
   const removeMetadataField = (key: string) => {
     if (key !== 'team' && key !== 'service') {
-      const { [key]: removed, ...rest } = localConfig.metadata;
+      const filteredMetadata = Object.fromEntries(
+        Object.entries(localConfig.metadata).filter(([k]) => k !== key)
+      );
       setLocalConfig(prev => ({
         ...prev,
-        metadata: rest,
+        metadata: filteredMetadata,
       }));
     }
   };
@@ -176,7 +178,7 @@ export const IncidentIoConfigComponent: React.FC<IncidentIoConfigProps> = ({
                     />
                     <input
                       type="text"
-                      value={value || ''}
+                      value={String(value || '')}
                       onChange={(e) => updateMetadata(key, e.target.value)}
                       placeholder="Value"
                       className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"

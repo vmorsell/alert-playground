@@ -8,7 +8,7 @@ interface AlertEventPayload {
   metadata: {
     priority: string;
     group_key: string;
-    [key: string]: any;
+    [key: string]: string | number | boolean | undefined;
   };
   source_url?: string;
 }
