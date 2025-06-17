@@ -1,8 +1,18 @@
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://alert-playground.vercel.app'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
   res.setHeader(
     'Access-Control-Allow-Methods',
-    'GET, POST, PUT, DELETE, OPTIONS',
+    'POST, OPTIONS',
   );
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
@@ -11,74 +21,85 @@ export default async function handler(req, res) {
     return;
   }
 
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   try {
-    // Extract path after /api/incident-io
     const requestUrl = new URL(req.url, `http://${req.headers.host}`);
     const fullPath = requestUrl.pathname;
 
-    console.log('Full request path:', fullPath);
-
-    // Remove /api/incident-io from the path
+    // only one expected path really, since we only publish alerts
+    const allowedPaths = [
+      'v2/alert_events/http/'
+    ];
+    
     const apiPath = fullPath.replace('/api/incident-io/', '');
+    
+    if (!apiPath || !allowedPaths.some(path => apiPath.startsWith(path))) {
+      return res.status(403).json({ 
+        error: 'Forbidden API path',
+        path: apiPath 
+      });
+    }
 
-    console.log('API path to forward:', apiPath);
-    console.log('Request method:', req.method);
-    console.log('Request headers:', req.headers);
-
-    if (!apiPath) {
-      return res.status(400).json({ error: 'No API path provided' });
+    // validate auth header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Invalid authorization header' });
     }
 
     const targetUrl = `https://api.incident.io/${apiPath}`;
-    console.log('Target URL:', targetUrl);
 
-    // Prepare headers for forwarding
     const forwardHeaders = {
       'User-Agent': 'Alert-Playground-Proxy/1.0',
+      'Authorization': authHeader,
+      'Content-Type': req.headers['content-type'] || 'application/json',
     };
 
-    if (req.headers.authorization) {
-      forwardHeaders['Authorization'] = req.headers.authorization;
-    }
-
-    if (req.method !== 'GET' && req.headers['content-type']) {
-      forwardHeaders['Content-Type'] = req.headers['content-type'];
-    }
-
     let requestBody;
-    if (req.method !== 'GET' && req.body) {
-      requestBody =
-        typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    if (req.body) {
+      requestBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      
+      // body should not be too large
+      if (requestBody.length > 1000) { // 1kB
+        return res.status(413).json({ error: 'Request body too large' });
+      }
     }
 
-    console.log('Request body:', requestBody);
-
-    // Forward the request to Incident.io API
-    const response = await fetch(targetUrl, {
-      method: req.method,
-      headers: forwardHeaders,
-      body: requestBody,
-    });
-
-    console.log('Incident.io response status:', response.status);
-
-    const data = await response.text();
-    console.log('Incident.io response body:', data);
-
-    res.status(response.status);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
     try {
-      const jsonData = JSON.parse(data);
-      res.json(jsonData);
-    } catch {
-      res.send(data);
+      const response = await fetch(targetUrl, {
+        method: req.method,
+        headers: forwardHeaders,
+        body: requestBody,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const data = await response.text();
+      res.status(response.status);
+
+      try {
+        const jsonData = JSON.parse(data);
+        res.json(jsonData);
+      } catch {
+        res.send(data);
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        return res.status(408).json({ error: 'Request timeout' });
+      }
+      throw fetchError;
     }
   } catch (error) {
-    console.error('Proxy error:', error);
+    console.error('Proxy error:', error.message);
     res.status(500).json({
-      error: 'Proxy request failed',
-      message: error.message,
-      stack: error.stack,
+      error: 'Internal server error',
     });
   }
 }
