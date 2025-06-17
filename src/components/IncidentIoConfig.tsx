@@ -20,11 +20,6 @@ export const IncidentIoConfigComponent: React.FC<IncidentIoConfigProps> = ({
     }
   });
 
-  const handleSave = () => {
-    onConfigChange(localConfig);
-    setIsExpanded(false);
-  };
-
   const handleSaveAndEnable = () => {
     const enabledConfig = { ...localConfig, enabled: true };
     onConfigChange(enabledConfig);
@@ -219,13 +214,6 @@ export const IncidentIoConfigComponent: React.FC<IncidentIoConfigProps> = ({
               title="Save configuration and enable Incident.io integration"
             >
               Save & Enable
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors"
-              title="Save configuration without changing enabled status"
-            >
-              Save Only
             </button>
             <button
               onClick={handleCancel}
