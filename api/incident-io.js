@@ -9,22 +9,27 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Extract the path segments after /api/incident-io/
-    const { path: pathSegments } = req.query;
+    // Extract path after /api/incident-io
+    const requestUrl = new URL(req.url, `http://${req.headers.host}`);
+    const fullPath = requestUrl.pathname;
     
-    console.log('Path segments:', pathSegments);
+    console.log('Full request path:', fullPath);
+    
+    // Remove /api/incident-io from the path
+    const apiPath = fullPath.replace('/api/incident-io/', '')
+    
+    console.log('API path to forward:', apiPath);
     console.log('Request method:', req.method);
     console.log('Request headers:', req.headers);
     
-    if (!pathSegments) {
-      return res.status(400).json({ error: 'No path provided' });
+    if (!apiPath) {
+      return res.status(400).json({ error: 'No API path provided' });
     }
     
-    const apiPath = Array.isArray(pathSegments) ? pathSegments.join('/') : pathSegments;
     const targetUrl = `https://api.incident.io/${apiPath}`;
-    
     console.log('Target URL:', targetUrl);
     
+    // Prepare headers for forwarding
     const forwardHeaders = {
       'User-Agent': 'Alert-Playground-Proxy/1.0',
     };
@@ -44,6 +49,7 @@ export default async function handler(req, res) {
     
     console.log('Request body:', requestBody);
     
+    // Forward the request to Incident.io API
     const response = await fetch(targetUrl, {
       method: req.method,
       headers: forwardHeaders,

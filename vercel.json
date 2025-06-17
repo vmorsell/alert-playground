@@ -1,7 +1,13 @@
 {
   "functions": {
-    "api/incident-io/[...path].js": {
+    "api/incident-io.js": {
       "maxDuration": 30
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/incident-io/(.*)",
+      "destination": "/api/incident-io"
+    }
+  ]
 } 
