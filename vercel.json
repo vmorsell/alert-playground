@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/incident-io/[...path].js": {
+      "maxDuration": 30
+    }
+  }
+} 
