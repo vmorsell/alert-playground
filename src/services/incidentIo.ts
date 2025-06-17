@@ -1,4 +1,4 @@
-import type { IncidentIoConfig, AlertThreshold } from '../types/metrics';
+import type { AlertThreshold, IncidentIoConfig } from '../types/metrics';
 
 interface AlertEventResponse {
   deduplication_key: string;
@@ -20,7 +20,10 @@ export class IncidentIoService {
     this.config = config;
   }
 
-  private generateDeduplicationKey(metricName: string, priority: string): string {
+  private generateDeduplicationKey(
+    metricName: string,
+    priority: string,
+  ): string {
     return `alert-playground-${SESSION_ID}-${metricName}-${priority}`;
   }
 
@@ -32,14 +35,17 @@ export class IncidentIoService {
     metricName: string,
     threshold: AlertThreshold,
     currentValue: number,
-    serviceName: string = 'demo-service'
+    serviceName: string = 'demo-service',
   ): Promise<void> {
     if (!this.config.enabled) {
       return;
     }
 
     try {
-      const deduplicationKey = this.generateDeduplicationKey(metricName, threshold.priority);
+      const deduplicationKey = this.generateDeduplicationKey(
+        metricName,
+        threshold.priority,
+      );
       const groupKey = this.generateGroupKey(metricName);
 
       const alertData = {
@@ -65,11 +71,11 @@ export class IncidentIoService {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${this.config.token}`,
+            Authorization: `Bearer ${this.config.token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(alertData),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -89,14 +95,17 @@ export class IncidentIoService {
     metricName: string,
     threshold: AlertThreshold,
     currentValue: number,
-    serviceName: string = 'demo-service'
+    serviceName: string = 'demo-service',
   ): Promise<void> {
     if (!this.config.enabled) {
       return;
     }
 
     try {
-      const deduplicationKey = this.generateDeduplicationKey(metricName, threshold.priority);
+      const deduplicationKey = this.generateDeduplicationKey(
+        metricName,
+        threshold.priority,
+      );
       const groupKey = this.generateGroupKey(metricName);
 
       const alertData = {
@@ -122,11 +131,11 @@ export class IncidentIoService {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${this.config.token}`,
+            Authorization: `Bearer ${this.config.token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(alertData),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -141,4 +150,4 @@ export class IncidentIoService {
       throw error;
     }
   }
-} 
+}

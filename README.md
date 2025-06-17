@@ -45,12 +45,12 @@ Open http://localhost:5173
 
 ## Metrics & Thresholds
 
-| Metric | Thresholds | Description |
-|--------|------------|-------------|
-| Error Rate | P0: >15%, P2: >5% | Request error percentage |
+| Metric            | Thresholds              | Description                    |
+| ----------------- | ----------------------- | ------------------------------ |
+| Error Rate        | P0: >15%, P2: >5%       | Request error percentage       |
 | P95 Response Time | P1: >1000ms, P3: >400ms | 95th percentile response times |
-| CPU Usage | P1: >90%, P3: >75% | CPU utilization |
-| Memory Usage | P1: >95%, P2: >85% | Memory utilization |
+| CPU Usage         | P1: >90%, P3: >75%      | CPU utilization                |
+| Memory Usage      | P1: >95%, P2: >85%      | Memory utilization             |
 
 ## Tech Stack
 

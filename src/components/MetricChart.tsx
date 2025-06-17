@@ -1,18 +1,18 @@
 import { Line } from 'react-chartjs-2';
 import {
-  Chart as ChartJS,
   CategoryScale,
+  Chart as ChartJS,
+  Legend,
   LinearScale,
-  PointElement,
   LineElement,
+  PointElement,
+  TimeScale,
   Title,
   Tooltip,
-  Legend,
-  TimeScale,
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import type { MetricDataPoint, AlertThreshold } from '../types/metrics';
 import { ALERT_COLORS } from '../config/metrics';
+import type { AlertThreshold, MetricDataPoint } from '../types/metrics';
 
 ChartJS.register(
   CategoryScale,
@@ -22,7 +22,7 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  TimeScale
+  TimeScale,
 );
 
 interface MetricChartProps {
@@ -33,22 +33,22 @@ interface MetricChartProps {
   alertThresholds?: AlertThreshold[];
 }
 
-export const MetricChart: React.FC<MetricChartProps> = ({ 
-  title, 
-  unit, 
-  dataPoints, 
+export const MetricChart: React.FC<MetricChartProps> = ({
+  title,
+  unit,
+  dataPoints,
   color = '#3b82f6',
-  alertThresholds = []
+  alertThresholds = [],
 }) => {
   const now = new Date();
   const twoMinutesAgo = new Date(now.getTime() - 120 * 1000); // 120 seconds ago
 
   // Create threshold datasets
-  const thresholdDatasets = alertThresholds.map(threshold => ({
+  const thresholdDatasets = alertThresholds.map((threshold) => ({
     label: `${threshold.priority} Threshold`,
     data: [
       { x: twoMinutesAgo.getTime(), y: threshold.threshold },
-      { x: now.getTime(), y: threshold.threshold }
+      { x: now.getTime(), y: threshold.threshold },
     ],
     borderColor: ALERT_COLORS[threshold.priority],
     backgroundColor: 'transparent',
@@ -64,7 +64,7 @@ export const MetricChart: React.FC<MetricChartProps> = ({
     datasets: [
       {
         label: title || 'Value',
-        data: dataPoints.map(point => ({
+        data: dataPoints.map((point) => ({
           x: point.timestamp.getTime(),
           y: point.value,
         })),
@@ -97,7 +97,10 @@ export const MetricChart: React.FC<MetricChartProps> = ({
       },
       tooltip: {
         callbacks: {
-          label: (context: { dataset: { label?: string }; parsed: { y: number } }) => {
+          label: (context: {
+            dataset: { label?: string };
+            parsed: { y: number };
+          }) => {
             const datasetLabel = context.dataset.label;
             if (datasetLabel && datasetLabel.includes('Threshold')) {
               return `${datasetLabel}: ${context.parsed.y.toFixed(2)} ${unit}`;
@@ -105,9 +108,15 @@ export const MetricChart: React.FC<MetricChartProps> = ({
             return `${context.parsed.y.toFixed(2)} ${unit}`;
           },
         },
-        filter: (tooltipItem: { dataset: { label?: string }; datasetIndex: number }) => {
+        filter: (tooltipItem: {
+          dataset: { label?: string };
+          datasetIndex: number;
+        }) => {
           // Only show tooltip for the main data line when hovering over threshold lines
-          return !tooltipItem.dataset.label?.includes('Threshold') || tooltipItem.datasetIndex === 0;
+          return (
+            !tooltipItem.dataset.label?.includes('Threshold') ||
+            tooltipItem.datasetIndex === 0
+          );
         },
       },
     },
@@ -143,7 +152,7 @@ export const MetricChart: React.FC<MetricChartProps> = ({
           font: {
             size: 10,
           },
-          callback: function(value: string | number) {
+          callback: function (value: string | number) {
             return `${Number(value).toFixed(1)} ${unit}`;
           },
         },
@@ -163,4 +172,4 @@ export const MetricChart: React.FC<MetricChartProps> = ({
       <Line data={chartData} options={options} />
     </div>
   );
-}; 
+};

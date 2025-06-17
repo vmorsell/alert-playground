@@ -1,4 +1,9 @@
-import type { AlertThreshold, AlertPriority, AlertState, ThresholdAlertState } from '../types/metrics';
+import type {
+  AlertPriority,
+  AlertState,
+  AlertThreshold,
+  ThresholdAlertState,
+} from '../types/metrics';
 
 export interface MetricConfig {
   name: string;
@@ -29,9 +34,27 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     color: '#ef4444',
     description: 'Percentage of requests that result in errors',
     alertThresholds: [
-      { priority: 'P0', threshold: 30, operator: 'greater_than', description: 'Error rate critical', resolveDelaySeconds: 5 },
-      { priority: 'P1', threshold: 15, operator: 'greater_than', description: 'Error rate high', resolveDelaySeconds: 5 },
-      { priority: 'P2', threshold: 5, operator: 'greater_than', description: 'Error rate elevated', resolveDelaySeconds: 5 },
+      {
+        priority: 'P0',
+        threshold: 30,
+        operator: 'greater_than',
+        description: 'Error rate critical',
+        resolveDelaySeconds: 5,
+      },
+      {
+        priority: 'P1',
+        threshold: 15,
+        operator: 'greater_than',
+        description: 'Error rate high',
+        resolveDelaySeconds: 5,
+      },
+      {
+        priority: 'P2',
+        threshold: 5,
+        operator: 'greater_than',
+        description: 'Error rate elevated',
+        resolveDelaySeconds: 5,
+      },
     ],
   },
   {
@@ -47,8 +70,20 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     color: '#f59e0b',
     description: '95th percentile of response times',
     alertThresholds: [
-      { priority: 'P1', threshold: 1000, operator: 'greater_than', description: 'Response time high', resolveDelaySeconds: 5 },
-      { priority: 'P3', threshold: 400, operator: 'greater_than', description: 'Response time elevated', resolveDelaySeconds: 5 },
+      {
+        priority: 'P1',
+        threshold: 1000,
+        operator: 'greater_than',
+        description: 'Response time high',
+        resolveDelaySeconds: 5,
+      },
+      {
+        priority: 'P3',
+        threshold: 400,
+        operator: 'greater_than',
+        description: 'Response time elevated',
+        resolveDelaySeconds: 5,
+      },
     ],
   },
   {
@@ -64,8 +99,20 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     color: '#3b82f6',
     description: 'Percentage of CPU resources being used',
     alertThresholds: [
-      { priority: 'P1', threshold: 90, operator: 'greater_than', description: 'CPU usage critical', resolveDelaySeconds: 5 },
-      { priority: 'P3', threshold: 75, operator: 'greater_than', description: 'CPU usage high', resolveDelaySeconds: 5 },
+      {
+        priority: 'P1',
+        threshold: 90,
+        operator: 'greater_than',
+        description: 'CPU usage critical',
+        resolveDelaySeconds: 5,
+      },
+      {
+        priority: 'P3',
+        threshold: 75,
+        operator: 'greater_than',
+        description: 'CPU usage high',
+        resolveDelaySeconds: 5,
+      },
     ],
   },
   {
@@ -81,15 +128,27 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     color: '#10b981',
     description: 'Percentage of memory resources being used',
     alertThresholds: [
-      { priority: 'P1', threshold: 95, operator: 'greater_than', description: 'Memory usage critical', resolveDelaySeconds: 5 },
-      { priority: 'P2', threshold: 85, operator: 'greater_than', description: 'Memory usage high', resolveDelaySeconds: 5 },
+      {
+        priority: 'P1',
+        threshold: 95,
+        operator: 'greater_than',
+        description: 'Memory usage critical',
+        resolveDelaySeconds: 5,
+      },
+      {
+        priority: 'P2',
+        threshold: 85,
+        operator: 'greater_than',
+        description: 'Memory usage high',
+        resolveDelaySeconds: 5,
+      },
     ],
   },
 ];
 
 // Helper functions to work with metric configs
 export const getMetricConfig = (metricName: string): MetricConfig => {
-  const config = METRIC_CONFIGS.find(config => config.name === metricName);
+  const config = METRIC_CONFIGS.find((config) => config.name === metricName);
   if (!config) {
     throw new Error(`Metric config not found for: ${metricName}`);
   }
@@ -108,7 +167,9 @@ export const getMetricColor = (metricName: string): string => {
   return getMetricConfig(metricName).color;
 };
 
-export const getMetricAlertThresholds = (metricName: string): AlertThreshold[] => {
+export const getMetricAlertThresholds = (
+  metricName: string,
+): AlertThreshold[] => {
   return getMetricConfig(metricName).alertThresholds;
 };
 
@@ -124,15 +185,19 @@ export const ALERT_COLORS: Record<AlertPriority, string> = {
 export const NORMAL_COLOR = '#10b981'; // Green-500 - Normal state
 
 // Utility function to evaluate alert state
-export const evaluateAlertState = (value: number, thresholds: AlertThreshold[]): AlertState => {
+export const evaluateAlertState = (
+  value: number,
+  thresholds: AlertThreshold[],
+): AlertState => {
   const activeThresholds: ThresholdAlertState[] = [];
 
   // Check each threshold independently
   for (const threshold of thresholds) {
-    const isTriggered = threshold.operator === 'greater_than' 
-      ? value > threshold.threshold 
-      : value < threshold.threshold;
-    
+    const isTriggered =
+      threshold.operator === 'greater_than'
+        ? value > threshold.threshold
+        : value < threshold.threshold;
+
     if (isTriggered) {
       activeThresholds.push({
         threshold,
@@ -153,9 +218,11 @@ export const getAlertColor = (alertState: AlertState): string => {
   if (alertState.isAlerting && alertState.activeThresholds.length > 0) {
     // Return the color of the highest priority active threshold
     const priorities = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
-    const highestPriorityThreshold = alertState.activeThresholds
-      .sort((a, b) => priorities[a.threshold.priority] - priorities[b.threshold.priority])[0];
+    const highestPriorityThreshold = alertState.activeThresholds.sort(
+      (a, b) =>
+        priorities[a.threshold.priority] - priorities[b.threshold.priority],
+    )[0];
     return ALERT_COLORS[highestPriorityThreshold.threshold.priority];
   }
   return NORMAL_COLOR;
-}; 
+};
