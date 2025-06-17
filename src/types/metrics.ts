@@ -29,24 +29,19 @@ export interface AlertThreshold {
   threshold: number;
   operator: 'greater_than' | 'less_than';
   description: string;
+  resolveDelaySeconds?: number; // Optional resolve delay to prevent flapping
 }
 
 export interface AlertState {
-  isAlerting: boolean;
-  activePriority?: AlertPriority;
-  triggeredThreshold?: AlertThreshold;
-  triggeredAt?: Date;
+  activeThresholds: ThresholdAlertState[];
+  isAlerting: boolean; // true if any threshold is triggered
 }
 
 export interface ThresholdAlertState {
   threshold: AlertThreshold;
   isTriggered: boolean;
   triggeredAt?: Date;
-}
-
-export interface AlertState {
-  activeThresholds: ThresholdAlertState[];
-  isAlerting: boolean; // true if any threshold is triggered
+  pendingResolveAt?: Date; // When the threshold became untriggered (for resolve delay)
 }
 
 export interface IncidentIoConfig {

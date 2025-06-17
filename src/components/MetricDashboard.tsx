@@ -23,6 +23,22 @@ const formatDuration = (startTime: Date): string => {
   }
 };
 
+const formatResolveDelay = (pendingResolveAt: Date, resolveDelaySeconds: number): string => {
+  const now = new Date();
+  const elapsedMs = now.getTime() - pendingResolveAt.getTime();
+  const elapsedSeconds = Math.floor(elapsedMs / 1000);
+  const remainingSeconds = Math.max(0, resolveDelaySeconds - elapsedSeconds);
+  
+  const minutes = Math.floor(remainingSeconds / 60);
+  const seconds = remainingSeconds % 60;
+  
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  } else {
+    return `${seconds}s`;
+  }
+};
+
 interface MetricDashboardProps {
   metrics: Record<string, Metric>;
   adjustMetric: (metricName: string, adjustment: number) => void;
@@ -181,6 +197,8 @@ export const MetricDashboard: React.FC<MetricDashboardProps> = ({
                     const highestPriorityThreshold = metric.alertState.activeThresholds
                       .sort((a, b) => priorities[a.threshold.priority] - priorities[b.threshold.priority])[0];
                     
+                    const isPendingResolve = !highestPriorityThreshold.isTriggered && highestPriorityThreshold.pendingResolveAt;
+                    
                     return (
                       <div 
                         className="mb-4 p-2 rounded-md text-sm font-medium"
@@ -193,7 +211,15 @@ export const MetricDashboard: React.FC<MetricDashboardProps> = ({
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="font-semibold">
-                              🚨 {highestPriorityThreshold.threshold.priority}: {highestPriorityThreshold.threshold.description}
+                              {isPendingResolve ? '🟡' : '🚨'} {highestPriorityThreshold.threshold.priority}: {highestPriorityThreshold.threshold.description}
+                              {isPendingResolve && (
+                                <span className="text-xs font-normal ml-2 opacity-75">
+                                  (pending resolve in {formatResolveDelay(
+                                    highestPriorityThreshold.pendingResolveAt!, 
+                                    highestPriorityThreshold.threshold.resolveDelaySeconds || 0
+                                  )})
+                                </span>
+                              )}
                             </div>
                           </div>
                           <div className="flex flex-row items-end gap-1">
@@ -236,6 +262,11 @@ export const MetricDashboard: React.FC<MetricDashboardProps> = ({
                               />
                               <span className="text-gray-600">
                                 {threshold.priority}: {threshold.threshold}{config.unit}
+                                {threshold.resolveDelaySeconds && (
+                                  <span className="text-gray-400 ml-1">
+                                    ({threshold.resolveDelaySeconds}s resolve delay)
+                                  </span>
+                                )}
                               </span>
                             </div>
                           ))}

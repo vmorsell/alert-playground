@@ -29,9 +29,9 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     color: '#ef4444',
     description: 'Percentage of requests that result in errors',
     alertThresholds: [
-      { priority: 'P0', threshold: 30, operator: 'greater_than', description: 'Error rate critical' },
-      { priority: 'P1', threshold: 15, operator: 'greater_than', description: 'Error rate high' },
-      { priority: 'P2', threshold: 5, operator: 'greater_than', description: 'Error rate elevated' },
+      { priority: 'P0', threshold: 30, operator: 'greater_than', description: 'Error rate critical', resolveDelaySeconds: 5 },
+      { priority: 'P1', threshold: 15, operator: 'greater_than', description: 'Error rate high', resolveDelaySeconds: 5 },
+      { priority: 'P2', threshold: 5, operator: 'greater_than', description: 'Error rate elevated', resolveDelaySeconds: 5 },
     ],
   },
   {
@@ -47,8 +47,8 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     color: '#f59e0b',
     description: '95th percentile of response times',
     alertThresholds: [
-      { priority: 'P1', threshold: 1000, operator: 'greater_than', description: 'Response times severely impacted' },
-      { priority: 'P2', threshold: 400, operator: 'greater_than', description: 'Response times elevated' },
+      { priority: 'P1', threshold: 1000, operator: 'greater_than', description: 'Response time high', resolveDelaySeconds: 5 },
+      { priority: 'P3', threshold: 400, operator: 'greater_than', description: 'Response time elevated', resolveDelaySeconds: 5 },
     ],
   },
   {
@@ -64,8 +64,8 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     color: '#3b82f6',
     description: 'Percentage of CPU resources being used',
     alertThresholds: [
-      { priority: 'P1', threshold: 90, operator: 'greater_than', description: 'CPU usage critical' },
-      { priority: 'P2', threshold: 75, operator: 'greater_than', description: 'CPU usage high' },
+      { priority: 'P1', threshold: 90, operator: 'greater_than', description: 'CPU usage critical', resolveDelaySeconds: 5 },
+      { priority: 'P3', threshold: 75, operator: 'greater_than', description: 'CPU usage high', resolveDelaySeconds: 5 },
     ],
   },
   {
@@ -81,8 +81,8 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     color: '#10b981',
     description: 'Percentage of memory resources being used',
     alertThresholds: [
-      { priority: 'P1', threshold: 95, operator: 'greater_than', description: 'Memory usage critical' },
-      { priority: 'P2', threshold: 85, operator: 'greater_than', description: 'Memory usage high' },
+      { priority: 'P1', threshold: 95, operator: 'greater_than', description: 'Memory usage critical', resolveDelaySeconds: 5 },
+      { priority: 'P2', threshold: 85, operator: 'greater_than', description: 'Memory usage high', resolveDelaySeconds: 5 },
     ],
   },
 ];

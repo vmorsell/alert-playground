@@ -83,6 +83,7 @@ export const useMetricSimulator = (incidentIoConfig: IncidentIoConfig) => {
   const incidentIoService = useRef<IncidentIoService>(new IncidentIoService(incidentIoConfig));
   const previousThresholdStates = useRef<Record<string, Record<string, boolean>>>({} as Record<string, Record<string, boolean>>);
   const thresholdTimestamps = useRef<Record<string, Record<string, Date>>>({} as Record<string, Record<string, Date>>);
+  const pendingResolves = useRef<Record<string, Record<string, Date>>>({} as Record<string, Record<string, Date>>);
 
   // Update service when config changes
   useEffect(() => {
@@ -101,9 +102,10 @@ export const useMetricSimulator = (incidentIoConfig: IncidentIoConfig) => {
     ) => {
       const thresholds = getMetricAlertThresholds(metricName);
       const previousStates = previousThresholdStates.current[metricName] || {};
-      
       const timestamps = thresholdTimestamps.current[metricName] || {};
+      const pending = pendingResolves.current[metricName] || {};
       const serviceName = incidentIoConfig.metadata.service || 'demo-service';
+      const now = new Date();
 
       const currentStates: Record<string, boolean> = {};
 
@@ -115,11 +117,13 @@ export const useMetricSimulator = (incidentIoConfig: IncidentIoConfig) => {
           : currentValue < threshold.threshold;
         
         const wasPreviouslyTriggered = previousStates[thresholdKey] || false;
+        const hasPendingResolve = pending[thresholdKey] !== undefined;
         currentStates[thresholdKey] = isCurrentlyTriggered;
 
         // Handle state changes for this specific threshold
         if (isCurrentlyTriggered && !wasPreviouslyTriggered) {
-          // Threshold just crossed - record timestamp and post alert
+          // Threshold just crossed - clear any pending resolve and post alert immediately
+          delete pending[thresholdKey];
           const triggeredAt = new Date();
           timestamps[thresholdKey] = triggeredAt;
           
@@ -134,18 +138,51 @@ export const useMetricSimulator = (incidentIoConfig: IncidentIoConfig) => {
             console.error(`Failed to post threshold alert for ${metricName} ${threshold.priority}:`, error);
           }
         } else if (!isCurrentlyTriggered && wasPreviouslyTriggered) {
-          // Threshold just uncrossed - remove timestamp and resolve alert
-          delete timestamps[thresholdKey];
+          // Threshold just uncrossed - start resolve delay if configured
+          const resolveDelaySeconds = threshold.resolveDelaySeconds || 0;
           
-          try {
-            await incidentIoService.current.resolveThresholdAlert(
-              metricName,
-              threshold,
-              currentValue,
-              serviceName
-            );
-          } catch (error) {
-            console.error(`Failed to resolve threshold alert for ${metricName} ${threshold.priority}:`, error);
+          if (resolveDelaySeconds > 0) {
+            // Set pending resolve timestamp
+            pending[thresholdKey] = new Date();
+          } else {
+            // No delay - resolve immediately
+            delete timestamps[thresholdKey];
+            
+            try {
+              await incidentIoService.current.resolveThresholdAlert(
+                metricName,
+                threshold,
+                currentValue,
+                serviceName
+              );
+            } catch (error) {
+              console.error(`Failed to resolve threshold alert for ${metricName} ${threshold.priority}:`, error);
+            }
+          }
+        } else if (isCurrentlyTriggered && hasPendingResolve) {
+          // Threshold re-triggered before resolve delay completed - cancel pending resolve
+          delete pending[thresholdKey];
+        } else if (!isCurrentlyTriggered && hasPendingResolve) {
+          // Check if resolve delay has elapsed
+          const resolveDelaySeconds = threshold.resolveDelaySeconds || 0;
+          const pendingResolveAt = pending[thresholdKey];
+          const elapsedSeconds = (now.getTime() - pendingResolveAt.getTime()) / 1000;
+          
+          if (elapsedSeconds >= resolveDelaySeconds) {
+            // Delay elapsed - resolve the alert
+            delete pending[thresholdKey];
+            delete timestamps[thresholdKey];
+            
+            try {
+              await incidentIoService.current.resolveThresholdAlert(
+                metricName,
+                threshold,
+                currentValue,
+                serviceName
+              );
+            } catch (error) {
+              console.error(`Failed to resolve threshold alert for ${metricName} ${threshold.priority}:`, error);
+            }
           }
         }
       }
@@ -153,6 +190,7 @@ export const useMetricSimulator = (incidentIoConfig: IncidentIoConfig) => {
       // Update previous states and timestamps
       previousThresholdStates.current[metricName] = currentStates;
       thresholdTimestamps.current[metricName] = timestamps;
+      pendingResolves.current[metricName] = pending;
     },
     [incidentIoConfig]
   );
@@ -164,21 +202,27 @@ export const useMetricSimulator = (incidentIoConfig: IncidentIoConfig) => {
   ): AlertState => {
     const activeThresholds: ThresholdAlertState[] = [];
     const timestamps = thresholdTimestamps.current[metricName] || {};
+    const pending = pendingResolves.current[metricName] || {};
 
     // Check each threshold independently
     for (const threshold of thresholds) {
+      const thresholdKey = `${threshold.priority}-${threshold.threshold}`;
       const isTriggered = threshold.operator === 'greater_than' 
         ? value > threshold.threshold 
         : value < threshold.threshold;
       
-      if (isTriggered) {
-        const thresholdKey = `${threshold.priority}-${threshold.threshold}`;
+      const hasPendingResolve = pending[thresholdKey] !== undefined;
+      
+      // Alert is active if currently triggered OR has a pending resolve (during delay period)
+      if (isTriggered || hasPendingResolve) {
         const triggeredAt = timestamps[thresholdKey] || new Date(); // Fallback to now if not tracked
+        const pendingResolveAt = pending[thresholdKey];
         
         activeThresholds.push({
           threshold,
-          isTriggered: true,
+          isTriggered,
           triggeredAt,
+          pendingResolveAt,
         });
       }
     }
