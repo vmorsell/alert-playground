@@ -1,10 +1,10 @@
 import React from 'react';
 import {
   ALERT_COLORS,
-  getAlertColor,
   getMetricConfig,
   getMetricStepSizes,
 } from '../config/metrics';
+import type { AlertManagerReturn } from '../hooks/useAlertManager';
 import type { IncidentIoConfig, Metric } from '../types/metrics';
 import { IncidentIoConfigComponent } from './IncidentIoConfig';
 import { MetricChart } from './MetricChart';
@@ -50,6 +50,7 @@ const formatResolveDelay = (
 interface MetricDashboardProps {
   metrics: Record<string, Metric>;
   adjustMetric: (metricName: string, adjustment: number) => void;
+  alertManager?: AlertManagerReturn;
   incidentIoConfig: IncidentIoConfig;
   updateIncidentIoConfig: (config: IncidentIoConfig) => void;
 }
@@ -57,6 +58,7 @@ interface MetricDashboardProps {
 export const MetricDashboard: React.FC<MetricDashboardProps> = ({
   metrics,
   adjustMetric,
+  alertManager,
   incidentIoConfig,
   updateIncidentIoConfig,
 }) => {
@@ -95,8 +97,18 @@ export const MetricDashboard: React.FC<MetricDashboardProps> = ({
             const config = getMetricConfig(metricName);
             const steps = getMetricStepSizes(metricName);
             const currentAdjustment = metric.adjustment;
-            const alertColor = getAlertColor(metric.alertState);
-            const isAlerting = metric.alertState.isAlerting;
+
+            const isAlerting =
+              alertManager?.isMetricAlerting(metricName) || false;
+            const highestPriorityAlert =
+              alertManager?.getHighestPriorityAlertForMetric(metricName);
+            const activeThresholds =
+              alertManager
+                ?.getThresholdsForMetric(metricName)
+                .filter((t) => !t.isHealthy) || [];
+            const alertColor = highestPriorityAlert
+              ? ALERT_COLORS[highestPriorityAlert.priority]
+              : '#10b981';
 
             return (
               <div
@@ -121,42 +133,19 @@ export const MetricDashboard: React.FC<MetricDashboardProps> = ({
                     </div>
 
                     {/* Alert Priority Badge - Show only highest priority */}
-                    {isAlerting &&
-                      metric.alertState.activeThresholds.length > 0 && (
-                        <div className="flex gap-1">
-                          {(() => {
-                            // Get the highest priority threshold (lowest number = highest priority)
-                            const priorities = {
-                              P0: 0,
-                              P1: 1,
-                              P2: 2,
-                              P3: 3,
-                              P4: 4,
-                            };
-                            const highestPriorityThreshold =
-                              metric.alertState.activeThresholds.sort(
-                                (a, b) =>
-                                  priorities[a.threshold.priority] -
-                                  priorities[b.threshold.priority],
-                              )[0];
-
-                            return (
-                              <div
-                                className="px-2 py-1 rounded-full text-xs font-bold text-white shadow-sm"
-                                style={{
-                                  backgroundColor:
-                                    ALERT_COLORS[
-                                      highestPriorityThreshold.threshold
-                                        .priority
-                                    ],
-                                }}
-                              >
-                                {highestPriorityThreshold.threshold.priority}
-                              </div>
-                            );
-                          })()}
+                    {isAlerting && highestPriorityAlert && (
+                      <div className="flex gap-1">
+                        <div
+                          className="px-2 py-1 rounded-full text-xs font-bold text-white shadow-sm"
+                          style={{
+                            backgroundColor:
+                              ALERT_COLORS[highestPriorityAlert.priority],
+                          }}
+                        >
+                          {highestPriorityAlert.priority}
                         </div>
-                      )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -226,65 +215,50 @@ export const MetricDashboard: React.FC<MetricDashboardProps> = ({
 
                 {/* Alert Description - Show only highest priority */}
                 {isAlerting &&
-                  metric.alertState.activeThresholds.length > 0 &&
+                  activeThresholds.length > 0 &&
                   (() => {
-                    // Get the highest priority threshold (lowest number = highest priority)
-                    const priorities = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
-                    const highestPriorityThreshold =
-                      metric.alertState.activeThresholds.sort(
-                        (a, b) =>
-                          priorities[a.threshold.priority] -
-                          priorities[b.threshold.priority],
-                      )[0];
+                    const activeThreshold = activeThresholds[0]; // Get the first active threshold
+                    const alert = activeThreshold.activeAlert;
 
-                    const isPendingResolve =
-                      !highestPriorityThreshold.isTriggered &&
-                      highestPriorityThreshold.pendingResolveAt;
+                    if (!alert) return null;
+
+                    const isPendingResolve = activeThreshold.isPendingResolve;
 
                     return (
                       <div
                         className="mb-4 p-2 rounded-md text-sm font-medium"
                         style={{
-                          backgroundColor: `${ALERT_COLORS[highestPriorityThreshold.threshold.priority]}15`,
-                          color:
-                            ALERT_COLORS[
-                              highestPriorityThreshold.threshold.priority
-                            ],
-                          border: `1px solid ${ALERT_COLORS[highestPriorityThreshold.threshold.priority]}30`,
+                          backgroundColor: `${ALERT_COLORS[alert.priority]}15`,
+                          color: ALERT_COLORS[alert.priority],
+                          border: `1px solid ${ALERT_COLORS[alert.priority]}30`,
                         }}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="font-semibold">
-                              {isPendingResolve ? '🟡' : '🚨'}{' '}
-                              {highestPriorityThreshold.threshold.priority}:{' '}
-                              {highestPriorityThreshold.threshold.description}
-                              {isPendingResolve && (
-                                <span className="text-xs font-normal ml-2 opacity-75">
-                                  (pending resolve in{' '}
-                                  {formatResolveDelay(
-                                    highestPriorityThreshold.pendingResolveAt!,
-                                    highestPriorityThreshold.threshold
-                                      .resolveDelaySeconds || 0,
-                                  )}
-                                  )
-                                </span>
-                              )}
+                              {isPendingResolve ? '🟡' : '🚨'} {alert.priority}:
+                              Alert Active
+                              {isPendingResolve &&
+                                activeThreshold.pendingResolveAt && (
+                                  <span className="text-xs font-normal ml-2 opacity-75">
+                                    (pending resolve in{' '}
+                                    {formatResolveDelay(
+                                      activeThreshold.pendingResolveAt,
+                                      activeThreshold.resolveDelaySeconds,
+                                    )}
+                                    )
+                                  </span>
+                                )}
                             </div>
                           </div>
                           <div className="flex flex-row items-end gap-1">
                             <div
                               className="px-2 py-1 rounded-full text-xs font-medium text-white min-w-[80px] text-center"
                               style={{
-                                backgroundColor:
-                                  ALERT_COLORS[
-                                    highestPriorityThreshold.threshold.priority
-                                  ],
+                                backgroundColor: ALERT_COLORS[alert.priority],
                               }}
                             >
-                              {formatDuration(
-                                highestPriorityThreshold.triggeredAt!,
-                              )}
+                              {formatDuration(alert.triggeredAt)}
                             </div>
                           </div>
                         </div>
@@ -342,7 +316,7 @@ export const MetricDashboard: React.FC<MetricDashboardProps> = ({
                       title=""
                       unit={config.unit}
                       stats={metric.stats}
-                      alertState={metric.alertState}
+                      color={alertColor}
                     />
                   </div>
                 </div>

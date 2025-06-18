@@ -63,5 +63,4 @@ export interface Metric {
   baseValue: number;
   variance: number;
   adjustment: number; // For manual adjustments
-  alertState: AlertState;
 }

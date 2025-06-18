@@ -1,23 +1,20 @@
-import { getAlertColor } from '../config/metrics';
-import type { AlertState, MetricStats } from '../types/metrics';
+import type { MetricStats } from '../types/metrics';
 
 interface MetricStatsProps {
   title: string;
   unit: string;
   stats: MetricStats;
-  alertState?: AlertState;
+  color?: string;
 }
 
 export const MetricStatsDisplay: React.FC<MetricStatsProps> = ({
   unit,
   stats,
-  alertState,
+  color = '#374151', // Default gray-700
 }) => {
   const formatValue = (value: number): string => {
     return value.toFixed(2);
   };
-
-  const alertColor = alertState ? getAlertColor(alertState) : '#374151'; // Default gray-700
 
   return (
     <div className="space-y-4">
@@ -25,7 +22,7 @@ export const MetricStatsDisplay: React.FC<MetricStatsProps> = ({
       <div className="text-right">
         <div
           className="text-3xl font-bold transition-colors duration-300"
-          style={{ color: alertColor }}
+          style={{ color }}
         >
           {formatValue(stats.current)} {unit}
         </div>

@@ -1,23 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isAfter, subMinutes } from 'date-fns';
-import {
-  getMetricAlertThresholds,
-  getMetricConfig,
-  METRIC_CONFIGS,
-} from '../config/metrics';
-import { IncidentIoService } from '../services/incidentIo';
-import type {
-  AlertState,
-  AlertThreshold,
-  IncidentIoConfig,
-  Metric,
-  MetricDataPoint,
-  MetricStats,
-  ThresholdAlertState,
-} from '../types/metrics';
+import { getMetricConfig, METRIC_CONFIGS } from '../config/metrics';
+import type { Metric, MetricDataPoint, MetricStats } from '../types/metrics';
+import type { AlertManagerReturn } from './useAlertManager';
 
-const SIMULATION_INTERVAL = 1000; // 1 second
-const DATA_RETENTION_MINUTES = 15; // Keep 15 minutes of data
+const SIMULATION_INTERVAL = 1000;
+const DATA_RETENTION_MINUTES = 15;
 
 const createInitialMetric = (metricName: string): Metric => {
   const config = getMetricConfig(metricName);
@@ -48,7 +36,6 @@ const createInitialMetric = (metricName: string): Metric => {
     baseValue: config.baseValue,
     variance: config.variance,
     adjustment: 0,
-    alertState: { activeThresholds: [], isAlerting: false },
   };
 };
 
@@ -56,55 +43,31 @@ const calculateStats = (
   dataPoints: MetricDataPoint[],
   now: Date,
 ): MetricStats => {
-  if (dataPoints.length === 0) {
-    return {
-      current: 0,
-      rolling1Min: { avg: 0, min: 0, max: 0 },
-      rolling5Min: { avg: 0, min: 0, max: 0 },
-      rolling15Min: { avg: 0, min: 0, max: 0 },
-    };
-  }
-
-  const current = dataPoints[dataPoints.length - 1]?.value || 0;
-
-  const calculateRollingStats = (minutes: number) => {
-    const cutoff = subMinutes(now, minutes);
-    const relevantPoints = dataPoints.filter((point) =>
-      isAfter(point.timestamp, cutoff),
+  const getDataInWindow = (minutes: number) =>
+    dataPoints.filter((point) =>
+      isAfter(point.timestamp, subMinutes(now, minutes)),
     );
 
-    if (relevantPoints.length === 0) {
-      return { avg: 0, min: 0, max: 0 };
-    }
+  const computeRollingStats = (data: MetricDataPoint[]) => {
+    if (data.length === 0) return { avg: 0, min: 0, max: 0 };
 
-    const values = relevantPoints.map((point) => point.value);
-    const sum = values.reduce((acc, val) => acc + val, 0);
-    const avg = sum / values.length;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-
-    return { avg, min, max };
+    const values = data.map((d) => d.value);
+    return {
+      avg: values.reduce((sum, val) => sum + val, 0) / values.length,
+      min: Math.min(...values),
+      max: Math.max(...values),
+    };
   };
 
   return {
-    current,
-    rolling1Min: calculateRollingStats(1),
-    rolling5Min: calculateRollingStats(5),
-    rolling15Min: calculateRollingStats(15),
+    current: dataPoints[dataPoints.length - 1]?.value || 0,
+    rolling1Min: computeRollingStats(getDataInWindow(1)),
+    rolling5Min: computeRollingStats(getDataInWindow(5)),
+    rolling15Min: computeRollingStats(getDataInWindow(15)),
   };
 };
 
-const generateValue = (
-  baseValue: number,
-  variance: number,
-  adjustment: number,
-): number => {
-  const randomVariation = (Math.random() - 0.5) * variance * 2;
-  const value = baseValue + randomVariation + adjustment;
-  return Math.max(0, value); // Ensure non-negative values
-};
-
-export const useMetricSimulator = (incidentIoConfig: IncidentIoConfig) => {
+export const useMetricSimulator = (alertManager: AlertManagerReturn) => {
   const [metrics, setMetrics] = useState<Record<string, Metric>>(() => {
     const initialMetrics = {} as Record<string, Metric>;
     METRIC_CONFIGS.forEach((config) => {
@@ -113,23 +76,14 @@ export const useMetricSimulator = (incidentIoConfig: IncidentIoConfig) => {
     return initialMetrics;
   });
 
-  const incidentIoService = useRef<IncidentIoService>(
-    new IncidentIoService(incidentIoConfig),
-  );
-  const previousThresholdStates = useRef<
-    Record<string, Record<string, boolean>>
-  >({} as Record<string, Record<string, boolean>>);
-  const thresholdTimestamps = useRef<Record<string, Record<string, Date>>>(
-    {} as Record<string, Record<string, Date>>,
-  );
-  const pendingResolves = useRef<Record<string, Record<string, Date>>>(
-    {} as Record<string, Record<string, Date>>,
-  );
-
-  // Update service when config changes
   useEffect(() => {
-    incidentIoService.current.updateConfig(incidentIoConfig);
-  }, [incidentIoConfig]);
+    METRIC_CONFIGS.forEach((config) => {
+      alertManager.alertManager.addThresholds(
+        config.name,
+        config.alertThresholds,
+      );
+    });
+  }, [alertManager.alertManager]);
 
   const cleanupOldData = useCallback(
     (dataPoints: MetricDataPoint[], now: Date): MetricDataPoint[] => {
@@ -139,245 +93,95 @@ export const useMetricSimulator = (incidentIoConfig: IncidentIoConfig) => {
     [],
   );
 
-  const handleThresholdStateChanges = useCallback(
-    async (metricName: string, currentValue: number) => {
-      const thresholds = getMetricAlertThresholds(metricName);
-      const previousStates = previousThresholdStates.current[metricName] || {};
-      const timestamps = thresholdTimestamps.current[metricName] || {};
-      const pending = pendingResolves.current[metricName] || {};
-      const serviceName = incidentIoConfig.metadata.service || 'demo-service';
-      const now = new Date();
+  const dataGenerationTimer = useRef<number | null>(null);
+  const latestMetricsRef = useRef<Record<string, Metric>>(metrics);
 
-      const currentStates: Record<string, boolean> = {};
+  useEffect(() => {
+    latestMetricsRef.current = metrics;
+  }, [metrics]);
 
-      // Check each threshold independently
-      for (const threshold of thresholds) {
-        const thresholdKey = `${threshold.priority}-${threshold.threshold}`;
-        const isCurrentlyTriggered =
-          threshold.operator === 'greater_than'
-            ? currentValue > threshold.threshold
-            : currentValue < threshold.threshold;
+  // data generation loop
+  useEffect(() => {
+    const startDataGeneration = () => {
+      dataGenerationTimer.current = window.setInterval(() => {
+        const now = new Date();
 
-        const wasPreviouslyTriggered = previousStates[thresholdKey] || false;
-        const hasPendingResolve = pending[thresholdKey] !== undefined;
-        currentStates[thresholdKey] = isCurrentlyTriggered;
+        setMetrics((prevMetrics) => {
+          const newMetrics = { ...prevMetrics };
 
-        // Handle state changes for this specific threshold
-        if (isCurrentlyTriggered && !wasPreviouslyTriggered) {
-          // Threshold just crossed - clear any pending resolve and post alert immediately
-          delete pending[thresholdKey];
-          const triggeredAt = new Date();
-          timestamps[thresholdKey] = triggeredAt;
+          for (const [metricName, metric] of Object.entries(newMetrics)) {
+            const config = getMetricConfig(metricName);
 
+            const randomChange = (Math.random() - 0.5) * config.variance * 2;
+            const newValue = Math.max(
+              0,
+              metric.baseValue + metric.adjustment + randomChange,
+            );
+
+            const newDataPoint: MetricDataPoint = {
+              timestamp: now,
+              value: newValue,
+            };
+
+            const updatedDataPoints = [...metric.dataPoints, newDataPoint];
+            const cleanedDataPoints = cleanupOldData(updatedDataPoints, now);
+            const newStats = calculateStats(cleanedDataPoints, now);
+
+            newMetrics[metricName] = {
+              ...metric,
+              dataPoints: cleanedDataPoints,
+              stats: newStats,
+            };
+          }
+
+          return newMetrics;
+        });
+      }, SIMULATION_INTERVAL);
+    };
+
+    startDataGeneration();
+
+    return () => {
+      if (dataGenerationTimer.current) {
+        clearInterval(dataGenerationTimer.current);
+      }
+    };
+  }, [cleanupOldData]);
+
+  // alert evaluation loop
+  useEffect(() => {
+    const evaluateAlerts = async () => {
+      const currentMetrics = latestMetricsRef.current;
+
+      for (const [metricName, metric] of Object.entries(currentMetrics)) {
+        if (metric.stats.current !== undefined) {
           try {
-            await incidentIoService.current.postThresholdAlert(
-              metricName,
-              threshold,
-              currentValue,
-              serviceName,
-            );
+            await alertManager.evaluateMetric(metricName, metric.stats.current);
           } catch (error) {
-            console.error(
-              `Failed to post threshold alert for ${metricName} ${threshold.priority}:`,
-              error,
-            );
-          }
-        } else if (!isCurrentlyTriggered && wasPreviouslyTriggered) {
-          // Threshold just uncrossed - start resolve delay if configured
-          const resolveDelaySeconds = threshold.resolveDelaySeconds || 0;
-
-          if (resolveDelaySeconds > 0) {
-            // Set pending resolve timestamp
-            pending[thresholdKey] = new Date();
-          } else {
-            // No delay - resolve immediately
-            delete timestamps[thresholdKey];
-
-            try {
-              await incidentIoService.current.resolveThresholdAlert(
-                metricName,
-                threshold,
-                currentValue,
-                serviceName,
-              );
-            } catch (error) {
-              console.error(
-                `Failed to resolve threshold alert for ${metricName} ${threshold.priority}:`,
-                error,
-              );
-            }
-          }
-        } else if (isCurrentlyTriggered && hasPendingResolve) {
-          // Threshold re-triggered before resolve delay completed - cancel pending resolve
-          delete pending[thresholdKey];
-        } else if (!isCurrentlyTriggered && hasPendingResolve) {
-          // Check if resolve delay has elapsed
-          const resolveDelaySeconds = threshold.resolveDelaySeconds || 0;
-          const pendingResolveAt = pending[thresholdKey];
-          const elapsedSeconds =
-            (now.getTime() - pendingResolveAt.getTime()) / 1000;
-
-          if (elapsedSeconds >= resolveDelaySeconds) {
-            // Delay elapsed - resolve the alert
-            delete pending[thresholdKey];
-            delete timestamps[thresholdKey];
-
-            try {
-              await incidentIoService.current.resolveThresholdAlert(
-                metricName,
-                threshold,
-                currentValue,
-                serviceName,
-              );
-            } catch (error) {
-              console.error(
-                `Failed to resolve threshold alert for ${metricName} ${threshold.priority}:`,
-                error,
-              );
-            }
+            console.error(`Error evaluating metric ${metricName}:`, error);
           }
         }
       }
+    };
 
-      // Update previous states and timestamps
-      previousThresholdStates.current[metricName] = currentStates;
-      thresholdTimestamps.current[metricName] = timestamps;
-      pendingResolves.current[metricName] = pending;
-    },
-    [incidentIoConfig],
-  );
+    // debounce
+    const timeoutId = setTimeout(evaluateAlerts, 100);
 
-  const evaluateAlertStateWithTimestamps = useCallback(
-    (
-      metricName: string,
-      value: number,
-      thresholds: AlertThreshold[],
-    ): AlertState => {
-      const activeThresholds: ThresholdAlertState[] = [];
-      const timestamps = thresholdTimestamps.current[metricName] || {};
-      const pending = pendingResolves.current[metricName] || {};
-
-      // Check each threshold independently
-      for (const threshold of thresholds) {
-        const thresholdKey = `${threshold.priority}-${threshold.threshold}`;
-        const isTriggered =
-          threshold.operator === 'greater_than'
-            ? value > threshold.threshold
-            : value < threshold.threshold;
-
-        const hasPendingResolve = pending[thresholdKey] !== undefined;
-
-        // Alert is active if currently triggered OR has a pending resolve (during delay period)
-        if (isTriggered || hasPendingResolve) {
-          const triggeredAt = timestamps[thresholdKey] || new Date(); // Fallback to now if not tracked
-          const pendingResolveAt = pending[thresholdKey];
-
-          activeThresholds.push({
-            threshold,
-            isTriggered,
-            triggeredAt,
-            pendingResolveAt,
-          });
-        }
-      }
-
-      return {
-        activeThresholds,
-        isAlerting: activeThresholds.length > 0,
-      };
-    },
-    [],
-  );
-
-  const updateMetrics = useCallback(() => {
-    const now = new Date();
-
-    setMetrics((prevMetrics) => {
-      const updatedMetrics = { ...prevMetrics };
-
-      Object.keys(updatedMetrics).forEach((key) => {
-        const metricName = key;
-        const metric = updatedMetrics[metricName];
-
-        // Generate new value
-        const newValue = generateValue(
-          metric.baseValue,
-          metric.variance,
-          metric.adjustment,
-        );
-
-        // Add new data point
-        const newDataPoint: MetricDataPoint = {
-          timestamp: now,
-          value: newValue,
-        };
-
-        // Clean up old data and add new point
-        const cleanedDataPoints = cleanupOldData(
-          [...metric.dataPoints, newDataPoint],
-          now,
-        );
-
-        // Calculate new stats
-        const newStats = calculateStats(cleanedDataPoints, now);
-
-        // Evaluate alert state with persistent timestamps
-        const thresholds = getMetricAlertThresholds(metricName);
-        const alertState = evaluateAlertStateWithTimestamps(
-          metricName,
-          newValue,
-          thresholds,
-        );
-
-        updatedMetrics[metricName] = {
-          ...metric,
-          dataPoints: cleanedDataPoints,
-          stats: newStats,
-          alertState,
-        };
-
-        // Handle alert state changes (async, don't block UI)
-        handleThresholdStateChanges(metricName, newValue);
-      });
-
-      return updatedMetrics;
-    });
-  }, [
-    cleanupOldData,
-    handleThresholdStateChanges,
-    evaluateAlertStateWithTimestamps,
-  ]);
+    return () => clearTimeout(timeoutId);
+  }, [metrics, alertManager]);
 
   const adjustMetric = useCallback((metricName: string, adjustment: number) => {
-    setMetrics((prevMetrics) => ({
-      ...prevMetrics,
+    setMetrics((prev) => ({
+      ...prev,
       [metricName]: {
-        ...prevMetrics[metricName],
+        ...prev[metricName],
         adjustment,
       },
     }));
   }, []);
 
-  const getMetricHistory = useCallback(
-    (metricName: string, minutes: number): MetricDataPoint[] => {
-      const cutoff = subMinutes(new Date(), minutes);
-
-      return metrics[metricName].dataPoints.filter((point) =>
-        isAfter(point.timestamp, cutoff),
-      );
-    },
-    [metrics],
-  );
-
-  // Start simulation
-  useEffect(() => {
-    const interval = setInterval(updateMetrics, SIMULATION_INTERVAL);
-    return () => clearInterval(interval);
-  }, [updateMetrics]);
-
   return {
     metrics,
     adjustMetric,
-    getMetricHistory,
   };
 };

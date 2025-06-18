@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MetricDashboard } from './components/MetricDashboard';
+import { useAlertManager } from './hooks/useAlertManager';
 import { useMetricSimulator } from './hooks/useMetricSimulator';
 import type { IncidentIoConfig } from './types/metrics';
 
@@ -34,7 +35,8 @@ function App() {
     },
   );
 
-  const { metrics, adjustMetric } = useMetricSimulator(incidentIoConfig);
+  const alertManager = useAlertManager(incidentIoConfig);
+  const { metrics, adjustMetric } = useMetricSimulator(alertManager);
 
   const updateIncidentIoConfig = (config: IncidentIoConfig) => {
     setIncidentIoConfig(config);
@@ -54,6 +56,7 @@ function App() {
     <MetricDashboard
       metrics={metrics}
       adjustMetric={adjustMetric}
+      alertManager={alertManager}
       incidentIoConfig={incidentIoConfig}
       updateIncidentIoConfig={updateIncidentIoConfig}
     />
