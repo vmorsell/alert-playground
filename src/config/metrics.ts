@@ -35,13 +35,6 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     description: 'Percentage of requests that result in errors',
     alertThresholds: [
       {
-        priority: 'P0',
-        threshold: 30,
-        operator: 'greater_than',
-        description: 'Error rate critical',
-        resolveDelaySeconds: 5,
-      },
-      {
         priority: 'P1',
         threshold: 15,
         operator: 'greater_than',
@@ -175,8 +168,7 @@ export const getMetricAlertThresholds = (
 
 // Alert priority colors
 export const ALERT_COLORS: Record<AlertPriority, string> = {
-  P0: '#dc2626', // Red-600 - Critical
-  P1: '#ea580c', // Orange-600 - High
+  P1: '#dc2626', // Red-600 - Critical
   P2: '#d97706', // Amber-600 - Medium
   P3: '#ca8a04', // Yellow-600 - Low
   P4: '#65a30d', // Lime-600 - Info
@@ -217,7 +209,7 @@ export const evaluateAlertState = (
 export const getAlertColor = (alertState: AlertState): string => {
   if (alertState.isAlerting && alertState.activeThresholds.length > 0) {
     // Return the color of the highest priority active threshold
-    const priorities = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
+    const priorities = { P1: 1, P2: 2, P3: 3, P4: 4 };
     const highestPriorityThreshold = alertState.activeThresholds.sort(
       (a, b) =>
         priorities[a.threshold.priority] - priorities[b.threshold.priority],

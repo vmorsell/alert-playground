@@ -22,7 +22,7 @@ export interface MetricStats {
   };
 }
 
-export type AlertPriority = 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
+export type AlertPriority = 'P1' | 'P2' | 'P3' | 'P4';
 
 export interface AlertThreshold {
   priority: AlertPriority;

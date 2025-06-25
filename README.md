@@ -39,7 +39,7 @@ Open http://localhost:5173
 
 ### Example Scenarios
 
-**High Error Rate**: Increase Error Rate → P2 fires at 5% → P1 fires at 15% → P0 fires at 30% → Reset to see resolution delays
+**High Error Rate**: Increase Error Rate → P2 fires at 5% → P1 fires at 15% → Reset to see resolution delays
 
 **Memory Pressure**: Increase Memory → P2 at 85% → P1 at 95% → Reset to baseline
 
@@ -47,10 +47,10 @@ Open http://localhost:5173
 
 | Metric            | Thresholds              | Resolve Delay | Description                    |
 | ----------------- | ----------------------- | ------------- | ------------------------------ |
-| Error Rate        | P0: >15%, P2: >5%       | 30s, 15s      | Request error percentage       |
-| P95 Response Time | P1: >1000ms, P3: >400ms | 45s, 20s      | 95th percentile response times |
-| CPU Usage         | P1: >90%, P3: >75%      | 60s, 30s      | CPU utilization                |
-| Memory Usage      | P1: >95%, P2: >85%      | 45s, 30s      | Memory utilization             |
+| Error Rate        | P1: >15%, P2: >5%       | 5s, 5s        | Request error percentage       |
+| P95 Response Time | P1: >1000ms, P3: >400ms | 5s, 5s        | 95th percentile response times |
+| CPU Usage         | P1: >90%, P3: >75%      | 5s, 5s        | CPU utilization                |
+| Memory Usage      | P1: >95%, P2: >85%      | 5s, 5s        | Memory utilization             |
 
 ## Tech Stack
 

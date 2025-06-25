@@ -210,7 +210,7 @@ export class AlertManager {
     const alerts = this.getActiveAlertsForMetric(metricName);
     if (alerts.length === 0) return undefined;
 
-    const priorities = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
+    const priorities = { P1: 1, P2: 2, P3: 3, P4: 4 };
     return alerts.sort(
       (a, b) => priorities[a.priority] - priorities[b.priority],
     )[0];
