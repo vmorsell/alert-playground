@@ -84,8 +84,13 @@ export class IncidentIoProvider implements IncidentManagementProvider {
         alert.setExternalIncidentId(result.deduplication_key);
       }
     } catch (error) {
-      console.error(`Failed to send ${status} alert to Incident.io:`, error);
-      throw error;
+      console.error(`Failed to send ${status} alert to Incident.io:`, {
+        alertId: alert.id,
+        metricName: alert.metricName,
+        priority: alert.priority,
+        status,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

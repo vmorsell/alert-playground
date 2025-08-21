@@ -86,8 +86,12 @@ export class IncidentIoService {
       const result: AlertEventResponse = await response.json();
       console.log('Threshold alert posted to Incident.io:', result);
     } catch (error) {
-      console.error('Failed to post threshold alert to Incident.io:', error);
-      throw error;
+      console.error('Failed to post threshold alert to Incident.io:', {
+        metricName,
+        threshold: threshold.priority,
+        currentValue,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -146,8 +150,12 @@ export class IncidentIoService {
       const result: AlertEventResponse = await response.json();
       console.log('Threshold alert resolved in Incident.io:', result);
     } catch (error) {
-      console.error('Failed to resolve threshold alert in Incident.io:', error);
-      throw error;
+      console.error('Failed to resolve threshold alert in Incident.io:', {
+        metricName,
+        threshold: threshold.priority,
+        currentValue,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 }

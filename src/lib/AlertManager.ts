@@ -116,7 +116,13 @@ export class AlertManager {
         this.eventHandlers.onThresholdStateChange?.(threshold);
       }
     } catch (error) {
-      console.error(`Failed to evaluate threshold ${threshold.id}:`, error);
+      console.error(`Failed to evaluate threshold ${threshold.id}:`, {
+        threshold: threshold.id,
+        metricName: threshold.metricName,
+        currentValue,
+        currentState,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -140,8 +146,14 @@ export class AlertManager {
           this.eventHandlers.onAlertResolved?.(alert);
         }
       } catch (error) {
-        console.error(`Failed to resolve threshold ${threshold.id}:`, error);
-        // On error, force the threshold back to healthy to prevent stuck state
+        console.error(`Failed to resolve threshold ${threshold.id}:`, {
+          threshold: threshold.id,
+          metricName: threshold.metricName,
+          alertId: threshold.activeAlert?.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
+        // force the threshold back to healthy to prevent stuck state
         try {
           threshold.transitionToHealthy();
           if (threshold.activeAlert) {
@@ -149,10 +161,13 @@ export class AlertManager {
           }
           this.eventHandlers.onThresholdStateChange?.(threshold);
         } catch (cleanupError) {
-          console.error(
-            `Failed to cleanup threshold ${threshold.id}:`,
-            cleanupError,
-          );
+          console.error(`Failed to cleanup threshold ${threshold.id}:`, {
+            threshold: threshold.id,
+            error:
+              cleanupError instanceof Error
+                ? cleanupError.message
+                : String(cleanupError),
+          });
         }
       }
     }

@@ -171,7 +171,11 @@ export const useMetricSimulator = (alertManager: AlertManagerReturn) => {
           try {
             await alertManager.evaluateMetric(metricName, metric.stats.current);
           } catch (error) {
-            console.error(`Error evaluating metric ${metricName}:`, error);
+            console.error(`Error evaluating metric ${metricName}:`, {
+              metricName,
+              currentValue: metric.stats.current,
+              error: error instanceof Error ? error.message : String(error),
+            });
           }
         }
       }
