@@ -6,7 +6,7 @@ A real-time metrics monitoring and alerting simulation platform with state machi
 
 - **Real-time metrics simulation** - Error Rate, P95 Response Time, CPU Usage, Memory Usage
 - **State machine alerting** - Advanced threshold management with resolve delays
-- **Incident.io integration** - Automatic alert creation and resolution
+- **Multi-provider incident management** - Support for Incident.io and FireHydrant
 - **Interactive controls** - Manual adjustments to trigger different scenarios
 - **Live charts** - Real-time visualization with threshold overlays
 
@@ -24,12 +24,25 @@ npm run dev
 
 Open http://localhost:5173
 
-## Incident.io Setup
+## Incident Management Setup
+
+### Incident.io Setup
 
 1. Get API token from Incident.io Settings → API Keys
 2. Create HTTP alert source and copy the Config ID
-3. Click "Configure Incident.io" in the app and enter your credentials
-4. Click "Save & Enable"
+3. Click "Configure" in the app and enable Incident.io
+4. Enter your credentials and click "Save & Enable"
+
+### FireHydrant Setup
+
+1. Create a Generic Webhook Event Source in FireHydrant
+2. Copy the webhook URL from the Signals Sources page (format: `https://signals.firehydrant.io/v1/process/...`)
+3. Click "Configure" in the app and enable FireHydrant
+4. Enter the webhook URL and metadata, then click "Save & Enable"
+
+### Multi-Provider Testing
+
+You can enable both providers simultaneously to test and compare how alerts appear in different incident management platforms. This is useful for evaluating which platform works best for your team.
 
 ## Usage
 
@@ -54,7 +67,7 @@ Open http://localhost:5173
 
 ## Tech Stack
 
-React 19 • TypeScript • Tailwind CSS v4 • Chart.js • Vite • Incident.io API
+React 19 • TypeScript • Tailwind CSS v4 • Chart.js • Vite • Incident.io API • FireHydrant API
 
 ## Development
 

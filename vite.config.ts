@@ -14,6 +14,14 @@ export default defineConfig({
         headers: {
           'Origin': 'https://api.incident.io'
         }
+      },
+      '/api/firehydrant': {
+        target: 'https://signals.firehydrant.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/firehydrant/, ''),
+        headers: {
+          'Origin': 'https://signals.firehydrant.com'
+        }
       }
     }
   }

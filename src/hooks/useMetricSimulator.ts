@@ -169,6 +169,7 @@ export const useMetricSimulator = (alertManager: AlertManagerReturn) => {
       for (const [metricName, metric] of Object.entries(currentMetrics)) {
         if (metric.stats.current !== undefined) {
           try {
+            console.log(`Evaluating ${metricName}: ${metric.stats.current}`);
             await alertManager.evaluateMetric(metricName, metric.stats.current);
           } catch (error) {
             console.error(`Error evaluating metric ${metricName}:`, {

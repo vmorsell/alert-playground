@@ -1,25 +1,25 @@
 import React from 'react';
 import type { AlertManagerReturn } from '../hooks/useAlertManager';
-import type { IncidentIoConfig, Metric } from '../types/metrics';
+import type { IncidentManagementConfigs, Metric } from '../types/metrics';
 import { Footer } from './Footer';
 import { Header } from './Header';
-import { IncidentIoConfigComponent } from './IncidentIoConfig';
+import { IncidentManagementConfig } from './IncidentManagementConfig';
 import { MetricCard } from './MetricCard';
 
 interface MetricDashboardProps {
   metrics: Record<string, Metric>;
   adjustMetric: (metricName: string, adjustment: number) => void;
   alertManager?: AlertManagerReturn;
-  incidentIoConfig: IncidentIoConfig;
-  updateIncidentIoConfig: (config: IncidentIoConfig) => void;
+  configs: IncidentManagementConfigs;
+  updateConfigs: (configs: IncidentManagementConfigs) => void;
 }
 
 export const MetricDashboard: React.FC<MetricDashboardProps> = ({
   metrics,
   adjustMetric,
   alertManager,
-  incidentIoConfig,
-  updateIncidentIoConfig,
+  configs,
+  updateConfigs,
 }) => {
   const handleAdjustment = (metricName: string, delta: number) => {
     const currentAdjustment = metrics[metricName].adjustment;
@@ -35,11 +35,11 @@ export const MetricDashboard: React.FC<MetricDashboardProps> = ({
       <div className="max-w-7xl mx-auto">
         <Header />
 
-        {/* Incident.io Configuration */}
+        {/* Incident Management Configuration */}
         <div className="mb-6">
-          <IncidentIoConfigComponent
-            config={incidentIoConfig}
-            onConfigChange={updateIncidentIoConfig}
+          <IncidentManagementConfig
+            configs={configs}
+            onConfigChange={updateConfigs}
           />
         </div>
 

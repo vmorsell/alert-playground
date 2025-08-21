@@ -55,6 +55,22 @@ export interface IncidentIoConfig {
   };
 }
 
+export interface FireHydrantConfig {
+  enabled: boolean;
+  webhookUrl: string;
+  metadata: {
+    team?: string;
+    service?: string;
+    environment?: string;
+    [key: string]: string | number | boolean | undefined;
+  };
+}
+
+export interface IncidentManagementConfigs {
+  incidentIo: IncidentIoConfig;
+  fireHydrant: FireHydrantConfig;
+}
+
 export interface Metric {
   displayName: string;
   unit: string;

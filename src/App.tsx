@@ -2,28 +2,28 @@ import { useState } from 'react';
 import { MetricDashboard } from './components/MetricDashboard';
 import { useAlertManager } from './hooks/useAlertManager';
 import { useMetricSimulator } from './hooks/useMetricSimulator';
-import type { IncidentIoConfig } from './types/metrics';
+import type { IncidentManagementConfigs } from './types/metrics';
 
 function App() {
-  const [incidentIoConfig, setIncidentIoConfig] = useState<IncidentIoConfig>(
-    () => {
-      // Load from localStorage if available
-      try {
-        const saved = localStorage.getItem(
-          'alert-playground-incident-io-config',
-        );
-        if (saved) {
-          return JSON.parse(saved);
-        }
-      } catch (error) {
-        console.warn(
-          'Failed to load Incident.io config from localStorage:',
-          error,
-        );
+  const [configs, setConfigs] = useState<IncidentManagementConfigs>(() => {
+    // Load from localStorage if available
+    try {
+      const saved = localStorage.getItem(
+        'alert-playground-incident-management-configs',
+      );
+      if (saved) {
+        return JSON.parse(saved);
       }
+    } catch (error) {
+      console.warn(
+        'Failed to load incident management configs from localStorage:',
+        error,
+      );
+    }
 
-      // Default config
-      return {
+    // Default configs
+    return {
+      incidentIo: {
         enabled: false,
         token: '',
         alertSourceConfigId: '',
@@ -31,24 +31,36 @@ function App() {
           team: '',
           service: '',
         },
-      };
-    },
-  );
+      },
+      fireHydrant: {
+        enabled: false,
+        webhookUrl: '',
+        metadata: {
+          team: '',
+          service: '',
+          environment: '',
+        },
+      },
+    };
+  });
 
-  const alertManager = useAlertManager(incidentIoConfig);
+  const alertManager = useAlertManager(configs);
   const { metrics, adjustMetric } = useMetricSimulator(alertManager);
 
-  const updateIncidentIoConfig = (config: IncidentIoConfig) => {
-    setIncidentIoConfig(config);
+  const updateConfigs = (newConfigs: IncidentManagementConfigs) => {
+    setConfigs(newConfigs);
 
     // Persist to localStorage
     try {
       localStorage.setItem(
-        'alert-playground-incident-io-config',
-        JSON.stringify(config),
+        'alert-playground-incident-management-configs',
+        JSON.stringify(newConfigs),
       );
     } catch (error) {
-      console.warn('Failed to save Incident.io config to localStorage:', error);
+      console.warn(
+        'Failed to save incident management configs to localStorage:',
+        error,
+      );
     }
   };
 
@@ -57,8 +69,8 @@ function App() {
       metrics={metrics}
       adjustMetric={adjustMetric}
       alertManager={alertManager}
-      incidentIoConfig={incidentIoConfig}
-      updateIncidentIoConfig={updateIncidentIoConfig}
+      configs={configs}
+      updateConfigs={updateConfigs}
     />
   );
 }

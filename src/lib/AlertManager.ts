@@ -97,6 +97,10 @@ export class AlertManager {
     const shouldFire = threshold.evaluate(currentValue);
     const currentState = threshold.state;
 
+    console.log(
+      `Threshold ${threshold.id}: value=${currentValue}, threshold=${threshold.value}, operator=${threshold.operator}, shouldFire=${shouldFire}, state=${currentState}`,
+    );
+
     try {
       if (
         shouldFire &&
@@ -104,6 +108,7 @@ export class AlertManager {
           currentState === 'pending_resolve' ||
           currentState === 'resolving')
       ) {
+        console.log(`Firing alert for threshold ${threshold.id}`);
         const alert = threshold.transitionToFiring(currentValue);
         this.activeAlerts.set(alert.id, alert);
 
@@ -112,6 +117,7 @@ export class AlertManager {
         this.eventHandlers.onThresholdStateChange?.(threshold);
         this.eventHandlers.onAlertCreated?.(alert);
       } else if (!shouldFire && currentState === 'firing') {
+        console.log(`Pending resolve for threshold ${threshold.id}`);
         threshold.transitionToPendingResolve();
         this.eventHandlers.onThresholdStateChange?.(threshold);
       }
