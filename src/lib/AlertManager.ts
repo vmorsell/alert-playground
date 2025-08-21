@@ -68,6 +68,10 @@ export class AlertManager {
     this.eventHandlers[event] = handler;
   }
 
+  off<K extends keyof AlertManagerEvents>(event: K): void {
+    delete this.eventHandlers[event];
+  }
+
   async evaluateMetric(
     metricName: string,
     currentValue: number,

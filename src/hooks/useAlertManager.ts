@@ -9,7 +9,7 @@ export interface AlertManagerReturn {
   alertManager: AlertManager;
   thresholds: Threshold[];
   activeAlerts: Alert[];
-  evaluateMetric: (metricName: string, currentValue: number) => void;
+  evaluateMetric: (metricName: string, currentValue: number) => Promise<void>;
   getThresholdsForMetric: (metricName: string) => Threshold[];
   getActiveAlertsForMetric: (metricName: string) => Alert[];
   isMetricAlerting: (metricName: string) => boolean;
@@ -34,28 +34,32 @@ export const useAlertManager = (
     incidentProvider.updateConfig(incidentIoConfig);
   }, [incidentProvider, incidentIoConfig]);
 
-  const [renderTrigger, setRenderTrigger] = useState<number>(0);
+  const [thresholds, setThresholds] = useState<Threshold[]>([]);
+  const [activeAlerts, setActiveAlerts] = useState<Alert[]>([]);
 
-  const forceUpdate = useCallback(() => {
-    setRenderTrigger((prev) => prev + 1);
+  const updateState = useCallback(() => {
+    if (alertManager.current) {
+      setThresholds(alertManager.current.getAllThresholds());
+      setActiveAlerts(alertManager.current.getAllActiveAlerts());
+    }
   }, []);
 
   useEffect(() => {
     const manager = alertManager.current;
     if (!manager) return;
 
-    manager.on('onThresholdStateChange', forceUpdate);
-    manager.on('onAlertCreated', forceUpdate);
-    manager.on('onAlertResolved', forceUpdate);
-  }, [forceUpdate]);
+    updateState();
 
-  const thresholds = useMemo(() => {
-    return alertManager.current?.getAllThresholds() || [];
-  }, [renderTrigger]);
+    manager.on('onThresholdStateChange', updateState);
+    manager.on('onAlertCreated', updateState);
+    manager.on('onAlertResolved', updateState);
 
-  const activeAlerts = useMemo(() => {
-    return alertManager.current?.getAllActiveAlerts() || [];
-  }, [renderTrigger]);
+    return () => {
+      manager.off('onThresholdStateChange');
+      manager.off('onAlertCreated');
+      manager.off('onAlertResolved');
+    };
+  }, [updateState]);
 
   const evaluateMetric = useCallback(
     async (metricName: string, currentValue: number) => {
@@ -68,46 +72,62 @@ export const useAlertManager = (
 
   const getThresholdsForMetric = useCallback(
     (metricName: string) => {
-      return alertManager.current?.getThresholdsForMetric(metricName) || [];
+      return thresholds.filter((t) => t.metricName === metricName);
     },
-    [renderTrigger],
+    [thresholds],
   );
 
   const getActiveAlertsForMetric = useCallback(
     (metricName: string) => {
-      return alertManager.current?.getActiveAlertsForMetric(metricName) || [];
+      return activeAlerts.filter(
+        (a) => a.metricName === metricName && !a.isResolved,
+      );
     },
-    [renderTrigger],
+    [activeAlerts],
   );
 
   const isMetricAlerting = useCallback(
     (metricName: string) => {
-      return alertManager.current?.isMetricAlerting(metricName) || false;
+      return activeAlerts.some(
+        (a) => a.metricName === metricName && !a.isResolved,
+      );
     },
-    [renderTrigger],
+    [activeAlerts],
   );
 
   const getHighestPriorityAlertForMetric = useCallback(
     (metricName: string) => {
-      return alertManager.current?.getHighestPriorityAlertForMetric(metricName);
+      const alerts = activeAlerts.filter(
+        (a) => a.metricName === metricName && !a.isResolved,
+      );
+      if (alerts.length === 0) return undefined;
+
+      const priorities = { P1: 1, P2: 2, P3: 3, P4: 4 };
+      return alerts.sort(
+        (a, b) => priorities[a.priority] - priorities[b.priority],
+      )[0];
     },
-    [renderTrigger],
+    [activeAlerts],
   );
 
   const getStats = useCallback(() => {
-    return (
-      alertManager.current?.getStats() || {
-        totalThresholds: 0,
-        activeAlerts: 0,
-        thresholdsByState: {
-          healthy: 0,
-          firing: 0,
-          pending_resolve: 0,
-          resolving: 0,
-        },
-      }
-    );
-  }, [renderTrigger]);
+    const thresholdsByState = {
+      healthy: 0,
+      firing: 0,
+      pending_resolve: 0,
+      resolving: 0,
+    };
+
+    thresholds.forEach((t) => {
+      thresholdsByState[t.state]++;
+    });
+
+    return {
+      totalThresholds: thresholds.length,
+      activeAlerts: activeAlerts.length,
+      thresholdsByState,
+    };
+  }, [thresholds, activeAlerts]);
 
   return {
     alertManager: alertManager.current!,
