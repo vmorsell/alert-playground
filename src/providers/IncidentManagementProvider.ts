@@ -11,5 +11,5 @@ export interface IncidentManagementProvider {
 
 export interface IncidentManagementConfig {
   enabled: boolean;
-  [key: string]: any;
+  [key: string]: string | number | boolean | undefined;
 }
