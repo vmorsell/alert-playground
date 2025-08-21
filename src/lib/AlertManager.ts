@@ -97,10 +97,6 @@ export class AlertManager {
     const shouldFire = threshold.evaluate(currentValue);
     const currentState = threshold.state;
 
-    console.log(
-      `Threshold ${threshold.id}: value=${currentValue}, threshold=${threshold.value}, operator=${threshold.operator}, shouldFire=${shouldFire}, state=${currentState}`,
-    );
-
     try {
       if (
         shouldFire &&
