@@ -9,7 +9,7 @@ interface FireHydrantEventResponse {
 interface FireHydrantEvent {
   summary: string;
   body: string;
-  level: 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
+  level: 'INFO' | 'WARN' | 'ERROR' | 'FATAL';
   status: 'OPEN' | 'RESOLVED';
   idempotency_key: string;
   images?: Array<{
@@ -180,18 +180,18 @@ export class FireHydrantProvider implements IncidentManagementProvider {
 
   private mapPriorityToLevel(
     priority: string,
-  ): 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL' {
+  ): 'INFO' | 'WARN' | 'ERROR' | 'FATAL' {
     switch (priority) {
       case 'P1':
-        return 'CRITICAL';
+        return 'FATAL';
       case 'P2':
         return 'ERROR';
       case 'P3':
-        return 'WARNING';
+        return 'WARN';
       case 'P4':
         return 'INFO';
       default:
-        return 'WARNING';
+        return 'WARN';
     }
   }
 
