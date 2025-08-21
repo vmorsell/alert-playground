@@ -196,7 +196,7 @@ export class FireHydrantProvider implements IncidentManagementProvider {
   }
 
   private generateIdempotencyKey(alert: Alert): string {
-    return `alert-playground-${alert.metricName}-${alert.priority}`;
+    return `alert-playground-${alert.metricName}`;
   }
 
   private formatMetricName(metricName: string): string {
