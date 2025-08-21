@@ -76,13 +76,18 @@ export const useMetricSimulator = (alertManager: AlertManagerReturn) => {
     return initialMetrics;
   });
 
+  const thresholdsSetup = useRef(false);
+
   useEffect(() => {
-    METRIC_CONFIGS.forEach((config) => {
-      alertManager.alertManager.addThresholds(
-        config.name,
-        config.alertThresholds,
-      );
-    });
+    if (!thresholdsSetup.current) {
+      METRIC_CONFIGS.forEach((config) => {
+        alertManager.alertManager.addThresholds(
+          config.name,
+          config.alertThresholds,
+        );
+      });
+      thresholdsSetup.current = true;
+    }
   }, [alertManager.alertManager]);
 
   const cleanupOldData = useCallback(
@@ -95,10 +100,6 @@ export const useMetricSimulator = (alertManager: AlertManagerReturn) => {
 
   const dataGenerationTimer = useRef<number | null>(null);
   const latestMetricsRef = useRef<Record<string, Metric>>(metrics);
-
-  useEffect(() => {
-    latestMetricsRef.current = metrics;
-  }, [metrics]);
 
   // data generation loop
   useEffect(() => {
@@ -134,6 +135,8 @@ export const useMetricSimulator = (alertManager: AlertManagerReturn) => {
             };
           }
 
+          // Update the ref with the latest metrics
+          latestMetricsRef.current = newMetrics;
           return newMetrics;
         });
       }, SIMULATION_INTERVAL);
@@ -148,9 +151,19 @@ export const useMetricSimulator = (alertManager: AlertManagerReturn) => {
     };
   }, [cleanupOldData]);
 
-  // alert evaluation loop
-  useEffect(() => {
-    const evaluateAlerts = async () => {
+  const evaluationState = useRef({
+    isEvaluating: false,
+    timeoutId: null as number | null,
+  });
+
+  const evaluateAlerts = useCallback(async () => {
+    if (evaluationState.current.isEvaluating) {
+      return;
+    }
+
+    evaluationState.current.isEvaluating = true;
+
+    try {
       const currentMetrics = latestMetricsRef.current;
 
       for (const [metricName, metric] of Object.entries(currentMetrics)) {
@@ -162,13 +175,31 @@ export const useMetricSimulator = (alertManager: AlertManagerReturn) => {
           }
         }
       }
+    } finally {
+      evaluationState.current.isEvaluating = false;
+    }
+  }, [alertManager]);
+
+  // debounced alert evaluation
+  useEffect(() => {
+    const state = evaluationState.current;
+
+    if (state.timeoutId) {
+      clearTimeout(state.timeoutId);
+    }
+
+    state.timeoutId = window.setTimeout(() => {
+      evaluateAlerts();
+      state.timeoutId = null;
+    }, 100);
+
+    return () => {
+      if (state.timeoutId) {
+        clearTimeout(state.timeoutId);
+        state.timeoutId = null;
+      }
     };
-
-    // debounce
-    const timeoutId = setTimeout(evaluateAlerts, 100);
-
-    return () => clearTimeout(timeoutId);
-  }, [metrics, alertManager]);
+  }, [metrics, evaluateAlerts]);
 
   const adjustMetric = useCallback((metricName: string, adjustment: number) => {
     setMetrics((prev) => ({
